@@ -29,9 +29,9 @@ function setupSheets() {
     playerSheet = ss.insertSheet(SHEET_PLAYERS);
   }
   playerSheet.clear();
-  playerSheet.getRange("A1:F1").setValues([
-    ["プレイヤーID", "勝数", "敗数", "消化試合数", "参加状況", "最終対戦日時"]
-  ]).setFontWeight("bold").setBackground("#c9daf8").setHorizontalAlignment("center");
+  const playerHeaders = REQUIRED_HEADERS[SHEET_PLAYERS];
+  playerSheet.getRange(1, 1, 1, playerHeaders.length).setValues([playerHeaders])
+    .setFontWeight("bold").setBackground("#c9daf8").setHorizontalAlignment("center");
   // 幅の調整
   playerSheet.setColumnWidth(1, 100);
   playerSheet.setColumnWidth(5, 100);
@@ -43,9 +43,9 @@ function setupSheets() {
     historySheet = ss.insertSheet(SHEET_HISTORY);
   }
   historySheet.clear();
-  historySheet.getRange("A1:E1").setValues([
-    ["日時", "プレイヤー1 ID", "プレイヤー2 ID", "勝者ID", "対戦ID"]
-  ]).setFontWeight("bold").setBackground("#fce5cd").setHorizontalAlignment("center");
+  const historyHeaders = REQUIRED_HEADERS[SHEET_HISTORY];
+  historySheet.getRange(1, 1, 1, historyHeaders.length).setValues([historyHeaders])
+    .setFontWeight("bold").setBackground("#fce5cd").setHorizontalAlignment("center");
   historySheet.setColumnWidth(1, 150);
 
   // 3. 対戦中シート
@@ -54,9 +54,9 @@ function setupSheets() {
     inProgressSheet = ss.insertSheet(SHEET_IN_PROGRESS);
   }
   inProgressSheet.clear();
-  inProgressSheet.getRange("A1:B1").setValues([
-    ["プレイヤー1 ID", "プレイヤー2 ID"]
-  ]).setFontWeight("bold").setBackground("#d9ead3").setHorizontalAlignment("center");
+  const inProgressHeaders = REQUIRED_HEADERS[SHEET_IN_PROGRESS];
+  inProgressSheet.getRange(1, 1, 1, inProgressHeaders.length).setValues([inProgressHeaders])
+    .setFontWeight("bold").setBackground("#d9ead3").setHorizontalAlignment("center");
   inProgressSheet.setColumnWidth(3, 80);
 
   Logger.log("シートの初期設定が完了しました。");

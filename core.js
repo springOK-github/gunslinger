@@ -107,6 +107,7 @@ function matchPlayers() {
 function promptAndRecordResult() {
   const ui = SpreadsheetApp.getUi();
 
+  // 最初にユーザー入力を受け付け
   const winnerResponse = ui.prompt(
     '対戦結果の記録',
     '勝者のプレイヤーIDの**数字部分のみ**を入力してください (例: P001なら「1」)。\n敗者は「対戦中」シートから自動特定されます。',
@@ -127,45 +128,48 @@ function promptAndRecordResult() {
 
   const formattedWinnerId = PLAYER_ID_PREFIX + Utilities.formatString(`%0${ID_DIGITS}d`, parseInt(rawId, 10));
 
+  // この時点でロックは取得しない
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
-  
+  const { indices, data } = validateHeaders(inProgressSheet, SHEET_IN_PROGRESS);
+  let loserId = null;
+
+  // 対戦相手の確認（ロック不要）
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const p1 = row[indices["プレイヤー1 ID"]];
+    const p2 = row[indices["プレイヤー2 ID"]];
+
+    if (p1 === formattedWinnerId) {
+      loserId = p2;
+      break;
+    } else if (p2 === formattedWinnerId) {
+      loserId = p1;
+      break;
+    }
+  }
+
+  if (loserId === null) {
+    ui.alert(`エラー: 勝者ID (${formattedWinnerId}) は「対戦中」シートに見つかりませんでした。\n入力IDが間違っているか、対戦が記録されていません。`);
+    return;
+  }
+
+  // ユーザーに確認
+  const confirmResponse = ui.alert(
+    '対戦結果の確認',
+    `以下の内容で記録してよろしいですか？\n\n` +
+    `勝者: ${formattedWinnerId}\n` +
+    `敗者: ${loserId}`,
+    ui.ButtonSet.YES_NO
+  );
+
+  if (confirmResponse !== ui.Button.YES) {
+    ui.alert('処理をキャンセルしました。');
+    return;
+  }
+
   try {
-    const { indices, data } = validateHeaders(inProgressSheet, SHEET_IN_PROGRESS);
-    let loserId = null;
-
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      const p1 = row[indices["プレイヤー1 ID"]];
-      const p2 = row[indices["プレイヤー2 ID"]];
-
-      if (p1 === formattedWinnerId) {
-        loserId = p2;
-        break;
-      } else if (p2 === formattedWinnerId) {
-        loserId = p1;
-        break;
-      }
-    }
-
-    if (loserId === null) {
-      ui.alert(`エラー: 勝者ID (${formattedWinnerId}) は「対戦中」シートに見つかりませんでした。\n入力IDが間違っているか、対戦が記録されていません。`);
-      return;
-    }
-
-    const confirmResponse = ui.alert(
-      '対戦結果の確認',
-      `以下の内容で記録してよろしいですか？\n\n` +
-      `勝者: ${formattedWinnerId}\n` +
-      `敗者: ${loserId}`,
-      ui.ButtonSet.YES_NO
-    );
-
-    if (confirmResponse !== ui.Button.YES) {
-      ui.alert('処理をキャンセルしました。');
-      return;
-    }
-
+    // recordResult内でロックを取得するため、ここではロック不要
     recordResult(formattedWinnerId);
   } catch (e) {
     ui.alert("エラーが発生しました: " + e.toString());
@@ -188,32 +192,83 @@ function recordResult(winnerId) {
 
   try {
     lock = acquireLock('対戦結果の記録');
+
+    // まず両プレイヤーの状態を確認
+    const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
+    const { indices: playerIndices, data: playerData } = validateHeaders(playerSheet, SHEET_PLAYERS);
+
+    let winnerFound = false;
+    let winnerDropped = false;
+    let loserDropped = false;
+
     const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
     const { indices: inProgressIndices, data: inProgressData } = 
       validateHeaders(inProgressSheet, SHEET_IN_PROGRESS);
-
-    let loserId = null;
-    let rowToClear = -1;
-
+    
+    let tempLoserId = null;
+    // まず敗者を特定
     for (let i = 1; i < inProgressData.length; i++) {
       const row = inProgressData[i];
       const p1 = row[inProgressIndices["プレイヤー1 ID"]];
       const p2 = row[inProgressIndices["プレイヤー2 ID"]];
 
       if (p1 === winnerId) {
-        loserId = p2;
-        rowToClear = i + 1;
+        tempLoserId = p2;
         break;
       } else if (p2 === winnerId) {
-        loserId = p1;
-        rowToClear = i + 1;
+        tempLoserId = p1;
         break;
       }
     }
 
-    if (loserId === null) {
+    if (tempLoserId === null) {
       ui.alert(`エラー: 勝者ID (${winnerId}) は「対戦中」シートに見つかりませんでした。\n入力IDが間違っているか、対戦が記録されていません。`);
       return;
+    }
+
+    // 両プレイヤーの状態を確認
+    for (let i = 1; i < playerData.length; i++) {
+      const row = playerData[i];
+      const playerId = row[playerIndices["プレイヤーID"]];
+      const status = row[playerIndices["参加状況"]];
+      
+      if (playerId === winnerId) {
+        winnerFound = true;
+        winnerDropped = status === PLAYER_STATUS.DROPPED;
+      } else if (playerId === tempLoserId) {
+        loserDropped = status === PLAYER_STATUS.DROPPED;
+      }
+    }
+
+    if (!winnerFound) {
+      ui.alert('エラー: 指定された勝者が見つかりません。');
+      return;
+    }
+
+    if (winnerDropped) {
+      ui.alert('エラー: 勝者としてマークされたプレイヤーはすでにドロップアウトしています。');
+      return;
+    }
+
+    if (loserDropped) {
+      ui.alert('エラー: 敗者としてマークされたプレイヤーはすでにドロップアウトしています。');
+      return;
+    }
+
+    // tempLoserIdをloserIdとして使用
+    const loserId = tempLoserId;
+    let rowToClear = -1;
+
+    // 対戦中の行を特定
+    for (let i = 1; i < inProgressData.length; i++) {
+      const row = inProgressData[i];
+      const p1 = row[inProgressIndices["プレイヤー1 ID"]];
+      const p2 = row[inProgressIndices["プレイヤー2 ID"]];
+
+      if ((p1 === winnerId && p2 === loserId) || (p2 === winnerId && p1 === loserId)) {
+        rowToClear = i + 1;
+        break;
+      }
     }
 
     const currentTime = new Date();
@@ -237,10 +292,7 @@ function recordResult(winnerId) {
       inProgressSheet.getRange(rowToClear, 1, 1, 2).clearContent();
     }
 
-    const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
-    const { indices: playerIndices, data: playerData } = 
-      validateHeaders(playerSheet, SHEET_PLAYERS);
-
+    // プレイヤーの状態を待機に戻す
     for (let i = 1; i < playerData.length; i++) {
       const row = playerData[i];
       const playerId = row[playerIndices["プレイヤーID"]];

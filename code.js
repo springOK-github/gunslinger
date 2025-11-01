@@ -14,12 +14,19 @@
  * - プレイヤードロップアウト処理
  */
 
-// --- 定数定義 ---
+// ----------------------------------------------------------------------
+// --- 定数定義（最上部に集約） ---
+// ----------------------------------------------------------------------
 const SHEET_PLAYERS = "プレイヤー";
 const SHEET_HISTORY = "対戦履歴";
 const SHEET_IN_PROGRESS = "対戦中";
 const PLAYER_ID_PREFIX = "P";
 const ID_DIGITS = 3; // IDの数字部分の桁数 (例: P001なら3)
+const PLAYER_STATUS = {
+  WAITING: "待機",
+  IN_PROGRESS: "対戦中",
+  DROPPED: "終了"
+};
 const REQUIRED_HEADERS = {
   [SHEET_PLAYERS]: ["プレイヤーID", "勝数", "敗数", "消化試合数", "参加状況", "最終対戦日時"],
   [SHEET_HISTORY]: ["日時", "プレイヤー1 ID", "プレイヤー2 ID", "勝者ID", "対戦ID"],
@@ -199,7 +206,7 @@ function matchPlayers() {
         const playerId = row[playerIndices["プレイヤーID"]];
         if (playerIdsToUpdate.includes(playerId)) {
           playerSheet.getRange(i + 1, playerIndices["参加状況"] + 1)
-            .setValue("対戦中");
+            .setValue(PLAYER_STATUS.IN_PROGRESS);
         }
       }
 
@@ -376,7 +383,7 @@ function recordResult(winnerId) {
       const playerId = row[playerIndices["プレイヤーID"]];
       if (playerId === winnerId || playerId === loserId) {
         playerSheet.getRange(i + 1, playerIndices["参加状況"] + 1)
-          .setValue("待機");
+          .setValue(PLAYER_STATUS.WAITING);
       }
     }
 
@@ -505,7 +512,7 @@ function getWaitingPlayers() {
     if (data.length <= 1) return [];
 
     const waiting = data.slice(1).filter(row => 
-      row[indices["参加状況"]] === "待機" && row[indices["参加状況"]] !== "終了"
+      row[indices["参加状況"]] === PLAYER_STATUS.WAITING && row[indices["参加状況"]] !== PLAYER_STATUS.DROPPED
     );
 
     waiting.sort((a, b) => {
@@ -649,7 +656,7 @@ function handleDropout() {
     for (let i = 1; i < playerData.length; i++) {
       const row = playerData[i];
       if (row[playerIndices["プレイヤーID"]] === playerId) {
-        playerSheet.getRange(i + 1, playerIndices["参加状況"] + 1).setValue("終了");
+        playerSheet.getRange(i + 1, playerIndices["参加状況"] + 1).setValue(PLAYER_STATUS.DROPPED);
         playerFound = true;
         break;
       }
@@ -690,7 +697,7 @@ function handleDropout() {
       for (let i = 1; i < playerData.length; i++) {
         const row = playerData[i];
         if (row[playerIndices["プレイヤーID"]] === opponentId) {
-          playerSheet.getRange(i + 1, playerIndices["参加状況"] + 1).setValue("待機");
+          playerSheet.getRange(i + 1, playerIndices["参加状況"] + 1).setValue(PLAYER_STATUS.WAITING);
           break;
         }
       }
@@ -735,7 +742,7 @@ function registerPlayer() {
     const newId = PLAYER_ID_PREFIX + Utilities.formatString(`%0${ID_DIGITS}d`, newIdNumber);
     const currentTime = new Date();
 
-    playerSheet.appendRow([newId, 0, 0, 0, "待機", currentTime]);
+  playerSheet.appendRow([newId, 0, 0, 0, PLAYER_STATUS.WAITING, currentTime]);
     Logger.log(`プレイヤー ${newId} を登録しました。`);
 
     const waitingPlayersCount = getWaitingPlayers().length;
@@ -770,7 +777,7 @@ function registerTestPlayers() {
     const newIdNumber = i + 1;
     const newId = PLAYER_ID_PREFIX + Utilities.formatString(`%0${ID_DIGITS}d`, newIdNumber);
     // 最終対戦日時を初期化時も設定
-    playerSheet.appendRow([newId, 0, 0, 0, "待機", new Date()]);
+  playerSheet.appendRow([newId, 0, 0, 0, PLAYER_STATUS.WAITING, new Date()]);
   }
 
   // 最終的にテストプレイヤーが揃った後に、一度マッチングを試みる

@@ -14,7 +14,6 @@ function onOpen() {
     .addSeparator()
     .addItem('新しいプレイヤーの登録', 'registerPlayer')
     .addItem('プレイヤーのドロップアウト', 'dropoutPlayer')
-    .addSeparator()
     .addItem('対戦結果の入力', 'promptAndRecordResult')
     .addToUi();
 }

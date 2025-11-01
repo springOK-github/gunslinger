@@ -16,8 +16,10 @@ function registerPlayer() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
   const ui = SpreadsheetApp.getUi();
-
+  let lock = null;
+  
   try {
+    lock = acquireLock('プレイヤー登録');
     getSheetStructure(playerSheet, SHEET_PLAYERS);
 
     const lastRow = playerSheet.getLastRow();
@@ -39,6 +41,9 @@ function registerPlayer() {
   } catch (e) {
     ui.alert("エラーが発生しました: " + e.toString());
     Logger.log("registerPlayer エラー: " + e.toString());
+  }
+  finally {
+    releaseLock(lock);
   }
 }
 

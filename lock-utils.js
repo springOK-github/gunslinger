@@ -14,7 +14,7 @@ const LOCK_TIMEOUT = 30000; // 30秒
  * @throws {Error} ロックが取得できない場合
  */
 function acquireLock(lockName) {
-  const lock = LockService.getDocumentLock();
+  const lock = LockService.getScriptLock();
   const success = lock.tryLock(LOCK_TIMEOUT);
   
   if (!success) {

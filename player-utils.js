@@ -24,8 +24,9 @@ function registerPlayer() {
     const newIdNumber = lastRow;
     const newId = PLAYER_ID_PREFIX + Utilities.formatString(`%0${ID_DIGITS}d`, newIdNumber);
     const currentTime = new Date();
+    const formattedTime = Utilities.formatDate(currentTime, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
 
-    playerSheet.appendRow([newId, 0, 0, 0, PLAYER_STATUS.WAITING, currentTime]);
+    playerSheet.appendRow([newId, 0, 0, 0, PLAYER_STATUS.WAITING, formattedTime]);
     Logger.log(`プレイヤー ${newId} を登録しました。`);
 
     const waitingPlayersCount = getWaitingPlayers().length;
@@ -204,7 +205,7 @@ function updatePlayerStats(playerId, isWinner, timestamp) {
         return;
       }
     }
-    Logger.log(`エラー: プレイヤーID ${playerId} が見つかりません。`);
+    Logger.log(`エラー: プレイヤー ${playerId} が見つかりません。`);
   } catch (e) {
     Logger.log("updatePlayerStats エラー: " + e.message);
   }

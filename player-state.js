@@ -115,6 +115,7 @@ function handleMatchStateChange(options) {
     // 4. 結果の記録（必要な場合）
     if (recordResult) {
       const currentTime = new Date();
+      const formattedTime = Utilities.formatDate(currentTime, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
       const historySheet = ss.getSheetByName(SHEET_HISTORY);
       validateHeaders(historySheet, SHEET_HISTORY);
       const newId = "T" + Utilities.formatString("%04d", historySheet.getLastRow());
@@ -123,15 +124,15 @@ function handleMatchStateChange(options) {
       const loser = isTargetWinner ? opponentId : targetPlayerId;
 
       historySheet.appendRow([
-        currentTime,
+        formattedTime,
         winner,
         loser,
         winner,
         newId
       ]);
 
-      updatePlayerStats(winner, true, currentTime);
-      updatePlayerStats(loser, false, currentTime);
+      updatePlayerStats(winner, true, formattedTime);
+      updatePlayerStats(loser, false, formattedTime);
     }
 
     // 5. 対戦中リストから削除（対戦中の場合のみ）

@@ -12,7 +12,7 @@ function onOpen() {
   ui.createMenu('🃏 ポケモンマッチング')
     .addItem('シートの初期設定', 'setupSheets')
     .addSeparator()
-    .addItem('新しいプレイヤーの登録', 'registerPlayer')
+    .addItem('新しいプレイヤーの追加', 'registerPlayer')
     .addItem('対戦結果の入力', 'promptAndRecordResult')
     .addItem('プレイヤーのドロップアウト', 'dropoutPlayer')
     .addToUi();

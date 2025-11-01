@@ -4,6 +4,43 @@
  * @author SpringOK
  */
 
+// =========================================
+// プレイヤー登録・管理系
+// =========================================
+
+/**
+ * 新しいプレイヤーを登録します。（本番・運営用）
+ * 実行すると、次のID（例: P009）が自動で採番され、シートに追加されます。
+ */
+function registerPlayer() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
+  const ui = SpreadsheetApp.getUi();
+
+  try {
+    validateHeaders(playerSheet, SHEET_PLAYERS);
+
+    const lastRow = playerSheet.getLastRow();
+    const newIdNumber = lastRow;
+    const newId = PLAYER_ID_PREFIX + Utilities.formatString(`%0${ID_DIGITS}d`, newIdNumber);
+    const currentTime = new Date();
+
+    playerSheet.appendRow([newId, 0, 0, 0, PLAYER_STATUS.WAITING, currentTime]);
+    Logger.log(`プレイヤー ${newId} を登録しました。`);
+
+    const waitingPlayersCount = getWaitingPlayers().length;
+    if (waitingPlayersCount >= 2) {
+      Logger.log(`プレイヤー登録後、待機プレイヤーが ${waitingPlayersCount} 人いるため、自動でマッチングを開始します。`);
+      matchPlayers();
+    } else {
+      Logger.log(`プレイヤー登録後、待機プレイヤーが ${waitingPlayersCount} 人です。自動マッチングはスキップされました。`);
+    }
+  } catch (e) {
+    ui.alert("エラーが発生しました: " + e.toString());
+    Logger.log("registerPlayer エラー: " + e.toString());
+  }
+}
+
 /**
  * プレイヤーを大会からドロップアウトさせます。
  * 参加状況を「終了」に変更し、進行中の対戦がある場合は無効にします。
@@ -116,38 +153,9 @@ function dropoutPlayer() {
   }
 }
 
-/**
- * 新しいプレイヤーを登録します。（本番・運営用）
- * 実行すると、次のID（例: P009）が自動で採番され、シートに追加されます。
- */
-function registerPlayer() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
-  const ui = SpreadsheetApp.getUi();
-
-  try {
-    validateHeaders(playerSheet, SHEET_PLAYERS);
-
-    const lastRow = playerSheet.getLastRow();
-    const newIdNumber = lastRow;
-    const newId = PLAYER_ID_PREFIX + Utilities.formatString(`%0${ID_DIGITS}d`, newIdNumber);
-    const currentTime = new Date();
-
-    playerSheet.appendRow([newId, 0, 0, 0, PLAYER_STATUS.WAITING, currentTime]);
-    Logger.log(`プレイヤー ${newId} を登録しました。`);
-
-    const waitingPlayersCount = getWaitingPlayers().length;
-    if (waitingPlayersCount >= 2) {
-      Logger.log(`プレイヤー登録後、待機プレイヤーが ${waitingPlayersCount} 人いるため、自動でマッチングを開始します。`);
-      matchPlayers();
-    } else {
-      Logger.log(`プレイヤー登録後、待機プレイヤーが ${waitingPlayersCount} 人です。自動マッチングはスキップされました。`);
-    }
-  } catch (e) {
-    ui.alert("エラーが発生しました: " + e.toString());
-    Logger.log("registerPlayer エラー: " + e.toString());
-  }
-}
+// =========================================
+// プレイヤーの状態取得・更新系
+// =========================================
 
 /**
  * 待機中のプレイヤーを抽出し、以下の優先順位でソートして返します。
@@ -181,6 +189,10 @@ function getWaitingPlayers() {
     return [];
   }
 }
+
+// =========================================
+// 対戦履歴・統計系
+// =========================================
 
 /**
  * 特定プレイヤーの過去の対戦相手のIDリスト（ブラックリスト）を取得します。

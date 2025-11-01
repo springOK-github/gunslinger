@@ -2,10 +2,16 @@
  * ポケモンカード・ガンスリンガーバトル用マッチングシステム
  * Google Apps Script (GAS) とスプレッドシートで動作します。
  *
- * 【変更点】
- * - プレイヤーシートに「最終対戦日時」列を追加。
- * - 待機プレイヤーのソート順を「勝数（降順）」と「最終対戦日時（降順=最近待機になった人優先）」に変更し、
- * 直近の勝者が優先的にマッチングされるようにしました。
+ * プレイヤーの状態遷移:
+ * 1. 待機: マッチング待ち
+ * 2. 対戦中: 対戦進行中
+ * 3. 終了: ドロップアウト済み
+ *
+ * 機能一覧:
+ * - プレイヤー登録・管理
+ * - 自動マッチング（再戦回避）
+ * - 対戦結果記録
+ * - プレイヤードロップアウト処理
  */
 
 // --- 設定 ---
@@ -126,7 +132,7 @@ function setupSheets() {
 }
 
 // ----------------------------------------------------------------------
-// --- メイン関数 ---
+// --- 初期設定・メニュー関連 ---
 // ----------------------------------------------------------------------
 
 /**
@@ -430,7 +436,195 @@ function cleanUpInProgressSheet() {
 
 
 // ----------------------------------------------------------------------
-// --- ヘルパー関数 ---
+// --- メイン機能（マッチング・結果記録・ドロップアウト） ---
+// ----------------------------------------------------------------------
+
+/**
+ * 待機中のプレイヤーを抽出し、以下の優先順位でソートして返します。
+ * 1. 勝数（降順）
+ * 2. 最終対戦日時（降順 = 最近待機に戻った人優先 = 直近の勝者優先）
+ */
+function getWaitingPlayers() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
+
+  try {
+    const { indices, data } = validateHeaders(playerSheet, SHEET_PLAYERS);
+    if (data.length <= 1) return [];
+
+    const waiting = data.slice(1).filter(row => 
+      row[indices["参加状況"]] === "待機" && row[indices["参加状況"]] !== "終了"
+    );
+
+    waiting.sort((a, b) => {
+      const winsDiff = b[indices["勝数"]] - a[indices["勝数"]];
+      if (winsDiff !== 0) return winsDiff;
+
+      const dateA = a[indices["最終対戦日時"]] instanceof Date ? a[indices["最終対戦日時"]].getTime() : 0;
+      const dateB = b[indices["最終対戦日時"]] instanceof Date ? b[indices["最終対戦日時"]].getTime() : 0;
+      return dateB - dateA;
+    });
+
+    return waiting;
+  } catch (e) {
+    Logger.log("getWaitingPlayers エラー: " + e.message);
+    return [];
+  }
+}
+
+/**
+ * 特定プレイヤーの過去の対戦相手のIDリスト（ブラックリスト）を取得します。
+ */
+function getPastOpponents(playerId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const historySheet = ss.getSheetByName(SHEET_HISTORY);
+
+  try {
+    const { indices, data } = validateHeaders(historySheet, SHEET_HISTORY);
+    if (data.length <= 1) return [];
+
+    const p1Col = indices["プレイヤー1 ID"];
+    const p2Col = indices["プレイヤー2 ID"];
+    const opponents = new Set();
+
+    data.slice(1).forEach(row => {
+      if (row[p1Col] === playerId) {
+        opponents.add(row[p2Col]);
+      } else if (row[p2Col] === playerId) {
+        opponents.add(row[p1Col]);
+      }
+    });
+
+    return Array.from(opponents);
+  } catch (e) {
+    Logger.log("getPastOpponents エラー: " + e.message);
+    return [];
+  }
+}
+
+/**
+ * プレイヤーの統計情報 (勝数, 敗数, 消化試合数) と最終対戦日時を更新します。
+ */
+function updatePlayerStats(playerId, isWinner, timestamp) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
+
+  try {
+    const { indices, data } = validateHeaders(playerSheet, SHEET_PLAYERS);
+    if (data.length <= 1) return;
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (row[indices["プレイヤーID"]] === playerId) {
+        const rowNum = i + 1;
+        const currentWins = parseInt(row[indices["勝数"]]) || 0;
+        const currentLosses = parseInt(row[indices["敗数"]]) || 0;
+        const currentTotal = parseInt(row[indices["消化試合数"]]) || 0;
+
+        playerSheet.getRange(rowNum, indices["勝数"] + 1)
+          .setValue(currentWins + (isWinner ? 1 : 0));
+        playerSheet.getRange(rowNum, indices["敗数"] + 1)
+          .setValue(currentLosses + (isWinner ? 0 : 1));
+        playerSheet.getRange(rowNum, indices["消化試合数"] + 1)
+          .setValue(currentTotal + 1);
+        playerSheet.getRange(rowNum, indices["最終対戦日時"] + 1)
+          .setValue(timestamp);
+
+        return;
+      }
+    }
+    Logger.log(`エラー: プレイヤーID ${playerId} が見つかりません。`);
+  } catch (e) {
+    Logger.log("updatePlayerStats エラー: " + e.message);
+  }
+}
+
+// ----------------------------------------------------------------------
+// --- テスト・管理用関数 ---
+// ----------------------------------------------------------------------
+
+// ----------------------------------------------------------------------
+// --- シート操作ヘルパー関数 ---
+// ----------------------------------------------------------------------
+
+/**
+ * シートのヘッダーを検証し、列インデックスを返します。
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet - 検証対象のシート
+ * @param {string} sheetName - シート名（SHEET_PLAYERS等の定数）
+ * @returns {{headers: string[], indices: Object.<string, number>, data: any[][]}} ヘッダー情報と全データ
+ * @throws {Error} 必須ヘッダーが不足している場合
+ */
+function validateHeaders(sheet, sheetName) {
+  if (!sheet) {
+    throw new Error(`シート「${sheetName}」が見つかりません。`);
+  }
+
+  const data = sheet.getDataRange().getValues();
+  if (!data || data.length === 0) {
+    throw new Error(`シート「${sheetName}」にデータがありません。`);
+  }
+
+  const headers = data[0].map(h => String(h).trim());
+  const indices = {};
+  const missing = [];
+  
+  const requiredHeaders = REQUIRED_HEADERS[sheetName];
+  if (!requiredHeaders) {
+    throw new Error(`シート「${sheetName}」の必須ヘッダー定義が見つかりません。`);
+  }
+
+  requiredHeaders.forEach(required => {
+    const idx = headers.indexOf(required);
+    if (idx === -1) {
+      missing.push(required);
+    } else {
+      indices[required] = idx;
+    }
+  });
+
+  if (missing.length > 0) {
+    throw new Error(`シート「${sheetName}」に必須ヘッダーが不足しています: ${missing.join(", ")}`);
+  }
+
+  return { headers, indices, data };
+}
+
+/**
+ * 「対戦中」シート内の空行（対戦が終了し、コンテンツがクリアされた行）を削除し、
+ * シート内のデータを上詰めして整理します。
+ */
+function cleanUpInProgressSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
+
+  try {
+    validateHeaders(inProgressSheet, SHEET_IN_PROGRESS);
+
+    const lastRow = inProgressSheet.getLastRow();
+    if (lastRow <= 1) {
+      Logger.log("「対戦中」シートにデータがないため、整理は不要です。");
+      return;
+    }
+
+    let deletedCount = 0;
+    for (let i = lastRow; i >= 2; i--) {
+      const cellA = inProgressSheet.getRange(i, 1).getValue();
+      if (cellA === "") {
+        inProgressSheet.deleteRow(i);
+        deletedCount++;
+      }
+    }
+
+    if (deletedCount > 0) {
+      Logger.log(`対戦中シートの整理 (自動実行) が完了しました。${deletedCount} 行の空行を削除しました。`);
+    }
+  } catch (e) {
+    Logger.log("cleanUpInProgressSheet エラー: " + e.message);
+  }
+}
+
+// ----------------------------------------------------------------------
+// --- プレイヤー管理ヘルパー関数 ---
 // ----------------------------------------------------------------------
 
 /**

@@ -59,45 +59,57 @@ function handleMatchStateChange(options) {
       return { success: false, message: `このプレイヤーはすでにドロップアウトしています。` };
     }
 
-    // 2. 対戦相手の特定
-    const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
-    const { indices: matchIndices, data: matchData } = validateHeaders(inProgressSheet, SHEET_IN_PROGRESS);
+    // 2. プレイヤーの現在の状態を取得
+    let currentStatus = null;
+    for (let i = 1; i < playerData.length; i++) {
+      const row = playerData[i];
+      if (row[playerIndices["プレイヤーID"]] === targetPlayerId) {
+        currentStatus = row[playerIndices["参加状況"]];
+        break;
+      }
+    }
 
+    // 3. 対戦中の場合のみ、対戦相手の処理
     let opponentId = null;
     let matchRow = -1;
 
-    for (let i = 1; i < matchData.length; i++) {
-      const row = matchData[i];
-      const p1 = row[matchIndices["プレイヤー1 ID"]];
-      const p2 = row[matchIndices["プレイヤー2 ID"]];
+    if (currentStatus === PLAYER_STATUS.IN_PROGRESS) {
+      const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
+      const { indices: matchIndices, data: matchData } = validateHeaders(inProgressSheet, SHEET_IN_PROGRESS);
 
-      if (p1 === targetPlayerId) {
-        opponentId = p2;
-        matchRow = i + 1;
-        break;
-      } else if (p2 === targetPlayerId) {
-        opponentId = p1;
-        matchRow = i + 1;
-        break;
+      for (let i = 1; i < matchData.length; i++) {
+        const row = matchData[i];
+        const p1 = row[matchIndices["プレイヤー1 ID"]];
+        const p2 = row[matchIndices["プレイヤー2 ID"]];
+
+        if (p1 === targetPlayerId) {
+          opponentId = p2;
+          matchRow = i + 1;
+          break;
+        } else if (p2 === targetPlayerId) {
+          opponentId = p1;
+          matchRow = i + 1;
+          break;
+        }
       }
-    }
 
-    if (!opponentId) {
-      return { success: false, message: `プレイヤーID ${targetPlayerId} は現在対戦中ではありません。` };
-    }
-
-    // 3. 対戦相手の状態確認
-    let opponentDropped = false;
-    for (let i = 1; i < playerData.length; i++) {
-      const row = playerData[i];
-      if (row[playerIndices["プレイヤーID"]] === opponentId) {
-        opponentDropped = row[playerIndices["参加状況"]] === PLAYER_STATUS.DROPPED;
-        break;
+      if (!opponentId) {
+        return { success: false, message: `データ不整合: 対戦中のはずのプレイヤーID ${targetPlayerId} の対戦相手が見つかりません。` };
       }
-    }
 
-    if (opponentDropped && opponentNewStatus !== PLAYER_STATUS.DROPPED) {
-      return { success: false, message: `対戦相手はすでにドロップアウトしています。` };
+      // 対戦相手の状態確認
+      let opponentDropped = false;
+      for (let i = 1; i < playerData.length; i++) {
+        const row = playerData[i];
+        if (row[playerIndices["プレイヤーID"]] === opponentId) {
+          opponentDropped = row[playerIndices["参加状況"]] === PLAYER_STATUS.DROPPED;
+          break;
+        }
+      }
+
+      if (opponentDropped && opponentNewStatus !== PLAYER_STATUS.DROPPED) {
+        return { success: false, message: `対戦相手はすでにドロップアウトしています。` };
+      }
     }
 
     // 4. 結果の記録（必要な場合）
@@ -122,8 +134,9 @@ function handleMatchStateChange(options) {
       updatePlayerStats(loser, false, currentTime);
     }
 
-    // 5. 対戦中リストから削除
-    if (matchRow !== -1) {
+    // 5. 対戦中リストから削除（対戦中の場合のみ）
+    if (currentStatus === PLAYER_STATUS.IN_PROGRESS && matchRow !== -1) {
+      const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
       inProgressSheet.getRange(matchRow, 1, 1, 2).clearContent();
     }
 

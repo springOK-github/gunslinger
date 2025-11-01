@@ -101,11 +101,6 @@ function dropoutPlayer() {
     return;
   }
 
-  let message = `プレイヤー ${playerId} のドロップアウトを処理しました。\n参加状況を「終了」に変更しました。`;
-  if (result.opponentId) {
-    message += `\n\n進行中の対戦を無効とし、対戦相手（${result.opponentId}）を待機状態に戻しました。`;
-  }
-  ui.alert('完了', message, ui.ButtonSet.OK);
 }
 
 // =========================================

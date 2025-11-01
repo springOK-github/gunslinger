@@ -202,14 +202,5 @@ function recordResult(winnerId) {
     return;
   }
 
-  // 成功メッセージをポップアップ表示
-  ui.alert('完了',
-    `対戦結果を記録しました。\n\n` +
-    `勝者: ${winnerId}\n` +
-    `敗者: ${result.opponentId}\n\n` +
-    `両プレイヤーを待機状態に戻しました。`,
-    ui.ButtonSet.OK
-  );
-
   Logger.log(`対戦結果が記録されました。勝者: ${winnerId}, 敗者: ${result.opponentId}。両プレイヤーは待機状態に戻りました。`);
 }

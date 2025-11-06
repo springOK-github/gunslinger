@@ -22,13 +22,29 @@ function registerPlayer() {
     lock = acquireLock('プレイヤー登録');
     getSheetStructure(playerSheet, SHEET_PLAYERS);
 
+    const response = ui.prompt(
+      'プレイヤー登録',
+      'プレイヤー名を入力してください：',
+      ui.ButtonSet.OK_CANCEL);
+
+    if (response.getSelectedButton() == ui.Button.CANCEL) {
+      Logger.log('プレイヤー登録がキャンセルされました。');
+      return;
+    }
+
+    const playerName = response.getResponseText().trim();
+    if (!playerName) {
+      ui.alert('エラー', 'プレイヤー名を入力してください。', ui.ButtonSet.OK);
+      return;
+    }
+
     const lastRow = playerSheet.getLastRow();
     const newIdNumber = lastRow;
-    const newId = PLAYER_ID_PREFIX + Utilities.formatString(`%0${ID_DIGITS}d`, newIdNumber);
     const currentTime = new Date();
+    const newId = PLAYER_ID_PREFIX + Utilities.formatString(`%0${ID_DIGITS}d`, newIdNumber);
     const formattedTime = Utilities.formatDate(currentTime, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
 
-    playerSheet.appendRow([newId, 0, 0, 0, PLAYER_STATUS.WAITING, formattedTime]);
+    playerSheet.appendRow([newId, playerName, 0, 0, 0, PLAYER_STATUS.WAITING, formattedTime]);
     Logger.log(`プレイヤー ${newId} を登録しました。`);
 
     const waitingPlayersCount = getWaitingPlayers().length;
@@ -155,8 +171,8 @@ function getPastOpponents(playerId) {
     const { indices, data } = getSheetStructure(historySheet, SHEET_HISTORY);
     if (data.length <= 1) return [];
 
-    const p1Col = indices["プレイヤー1 ID"];
-    const p2Col = indices["プレイヤー2 ID"];
+    const p1Col = indices["ID1"];
+    const p2Col = indices["ID2"];
     const opponents = new Set();
 
     data.slice(1).forEach(row => {

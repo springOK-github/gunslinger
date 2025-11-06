@@ -78,8 +78,14 @@ function matchPlayers() {
 
       const lastRow = inProgressSheet.getLastRow();
       if (matches.length > 0) {
-        inProgressSheet.getRange(lastRow + 1, 1, matches.length, 2)
-          .setValues(matches);
+        const matchesWithNames = matches.map(match => [
+          match[0],
+          getPlayerName(match[0]),
+          match[1],
+          getPlayerName(match[1])
+        ]);
+        inProgressSheet.getRange(lastRow + 1, 1, matches.length, 4)
+          .setValues(matchesWithNames);
       }
 
       Logger.log(`マッチングが ${matches.length} 件成立しました。「${SHEET_IN_PROGRESS}」シートを確認してください。`);
@@ -110,7 +116,7 @@ function promptAndRecordResult() {
   // 最初にユーザー入力を受け付け
   const winnerResponse = ui.prompt(
     '対戦結果の記録',
-    '勝者のプレイヤーIDの**数字部分のみ**を入力してください (例: P001なら「1」)。\n敗者は「${SHEET_IN_PROGRESS}」シートから自動特定されます。',
+    `勝者のプレイヤーIDの**数字部分のみ**を入力してください (例: P001なら「1」)。`,
     ui.ButtonSet.OK_CANCEL
   );
 
@@ -137,8 +143,8 @@ function promptAndRecordResult() {
   // 対戦相手の確認（ロック不要）
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    const p1 = row[indices["プレイヤー1 ID"]];
-    const p2 = row[indices["プレイヤー2 ID"]];
+    const p1 = row[indices["ID1"]];
+    const p2 = row[indices["ID2"]];
 
     if (p1 === formattedWinnerId) {
       loserId = p2;
@@ -158,8 +164,8 @@ function promptAndRecordResult() {
   const confirmResponse = ui.alert(
     '対戦結果の確認',
     `以下の内容で記録してよろしいですか？\n\n` +
-    `勝者: ${formattedWinnerId}\n` +
-    `敗者: ${loserId}`,
+    `勝者: ${getPlayerName(formattedWinnerId)}\n` +
+    `敗者: ${getPlayerName(loserId)}`,
     ui.ButtonSet.YES_NO
   );
 

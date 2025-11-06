@@ -47,6 +47,24 @@ function getSheetStructure(sheet, sheetName) {
 }
 
 /**
+ * プレイヤーIDから名前を取得します
+ * @param {string} playerId プレイヤーID
+ * @returns {string} プレイヤー名。見つからない場合はIDをそのまま返します
+ */
+function getPlayerName(playerId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
+  const { indices, data } = getSheetStructure(playerSheet, SHEET_PLAYERS);
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][indices["プレイヤーID"]] === playerId) {
+      return data[i][indices["プレイヤー名"]] || playerId;
+    }
+  }
+  return playerId;
+}
+
+/**
  * 「マッチング」シート内の空行（対戦が終了し、コンテンツがクリアされた行）を削除し、
  * シート内のデータを上詰めして整理します。
  */

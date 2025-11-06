@@ -79,8 +79,8 @@ function updatePlayerState(options) {
 
       for (let i = 1; i < matchData.length; i++) {
         const row = matchData[i];
-        const p1 = row[matchIndices["プレイヤー1 ID"]];
-        const p2 = row[matchIndices["プレイヤー2 ID"]];
+        const p1 = row[matchIndices["ID1"]];
+        const p2 = row[matchIndices["ID2"]];
 
         if (p1 === targetPlayerId) {
           opponentId = p2;
@@ -122,12 +122,16 @@ function updatePlayerState(options) {
 
       const winner = isTargetWinner ? targetPlayerId : opponentId;
       const loser = isTargetWinner ? opponentId : targetPlayerId;
+      const winnerName = getPlayerName(winner);
+      const loserName = getPlayerName(loser);
 
       historySheet.appendRow([
         formattedTime,
         winner,
+        winnerName,
         loser,
-        winner,
+        loserName,
+        winnerName,
         newId
       ]);
 

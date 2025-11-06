@@ -131,7 +131,7 @@ function updatePlayerState(options) {
         winnerName,
         loser,
         loserName,
-        winner,
+        winnerName,
         newId
       ]);
 

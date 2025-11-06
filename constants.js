@@ -16,6 +16,6 @@ const PLAYER_STATUS = {
 };
 const REQUIRED_HEADERS = {
   [SHEET_PLAYERS]: ["プレイヤーID", "プレイヤー名", "勝数", "敗数", "消化試合数", "参加状況", "最終対戦日時"],
-  [SHEET_HISTORY]: ["日時", "プレイヤー1 ID","プレイヤー1", "プレイヤー2 ID","プレイヤー2", "勝者名", "対戦ID"],
-  [SHEET_IN_PROGRESS]: ["プレイヤー1 ID","プレイヤー1", "プレイヤー2 ID","プレイヤー2"]
+  [SHEET_HISTORY]: ["日時", "ID1","プレイヤー1", "ID2","プレイヤー2", "勝者名", "対戦ID"],
+  [SHEET_IN_PROGRESS]: ["ID1","プレイヤー1", "ID2","プレイヤー2"]
 };

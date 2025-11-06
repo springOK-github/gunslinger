@@ -171,8 +171,8 @@ function getPastOpponents(playerId) {
     const { indices, data } = getSheetStructure(historySheet, SHEET_HISTORY);
     if (data.length <= 1) return [];
 
-    const p1Col = indices["プレイヤー1 ID"];
-    const p2Col = indices["プレイヤー2 ID"];
+    const p1Col = indices["ID1"];
+    const p2Col = indices["ID2"];
     const opponents = new Set();
 
     data.slice(1).forEach(row => {

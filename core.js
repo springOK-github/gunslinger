@@ -116,7 +116,7 @@ function promptAndRecordResult() {
   // 最初にユーザー入力を受け付け
   const winnerResponse = ui.prompt(
     '対戦結果の記録',
-    '勝者のプレイヤーIDの**数字部分のみ**を入力してください (例: P001なら「1」)。\n敗者は「${SHEET_IN_PROGRESS}」シートから自動特定されます。',
+    `勝者のプレイヤーIDの**数字部分のみ**を入力してください (例: P001なら「1」)。`,
     ui.ButtonSet.OK_CANCEL
   );
 
@@ -143,8 +143,8 @@ function promptAndRecordResult() {
   // 対戦相手の確認（ロック不要）
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    const p1 = row[indices["プレイヤー1 ID"]];
-    const p2 = row[indices["プレイヤー2 ID"]];
+    const p1 = row[indices["ID1"]];
+    const p2 = row[indices["ID2"]];
 
     if (p1 === formattedWinnerId) {
       loserId = p2;

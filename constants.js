@@ -6,7 +6,7 @@
 
 const SHEET_PLAYERS = "プレイヤー";
 const SHEET_HISTORY = "対戦履歴";
-const SHEET_IN_PROGRESS = "対戦中";
+const SHEET_IN_PROGRESS = "マッチング";
 const PLAYER_ID_PREFIX = "P";
 const ID_DIGITS = 3; // IDの数字部分の桁数 (例: P001なら3)
 const PLAYER_STATUS = {

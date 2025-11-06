@@ -45,7 +45,7 @@ function setupSheets() {
     .setFontWeight("bold").setBackground("#fce5cd").setHorizontalAlignment("center");
   historySheet.setColumnWidth(1, 150);
 
-  // 3. 対戦中シート
+  // 3. マッチングシート
   let inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
   if (!inProgressSheet) {
     inProgressSheet = ss.insertSheet(SHEET_IN_PROGRESS);

@@ -47,7 +47,7 @@ function getSheetStructure(sheet, sheetName) {
 }
 
 /**
- * 「対戦中」シート内の空行（対戦が終了し、コンテンツがクリアされた行）を削除し、
+ * 「マッチング」シート内の空行（対戦が終了し、コンテンツがクリアされた行）を削除し、
  * シート内のデータを上詰めして整理します。
  */
 function cleanUpInProgressSheet() {
@@ -59,7 +59,7 @@ function cleanUpInProgressSheet() {
 
     const lastRow = inProgressSheet.getLastRow();
     if (lastRow <= 1) {
-      Logger.log("「対戦中」シートにデータがないため、整理は不要です。");
+      Logger.log(`「${SHEET_IN_PROGRESS}」シートにデータがないため、整理は不要です。`);
       return;
     }
 
@@ -73,7 +73,7 @@ function cleanUpInProgressSheet() {
     }
 
     if (deletedCount > 0) {
-      Logger.log(`対戦中シートの整理 (自動実行) が完了しました。${deletedCount} 行の空行を削除しました。`);
+      Logger.log(`「${SHEET_IN_PROGRESS}」シートの整理 (自動実行) が完了しました。${deletedCount} 行の空行を削除しました。`);
     }
   } catch (e) {
     Logger.log("cleanUpInProgressSheet エラー: " + e.message);

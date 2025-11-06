@@ -82,7 +82,7 @@ function matchPlayers() {
           .setValues(matches);
       }
 
-      Logger.log(`マッチングが ${matches.length} 件成立しました。「対戦中」シートを確認してください。`);
+      Logger.log(`マッチングが ${matches.length} 件成立しました。「${SHEET_IN_PROGRESS}」シートを確認してください。`);
       return matches.length;
     } else {
       Logger.log("警告: 新しいマッチングは成立しませんでした。");
@@ -110,7 +110,7 @@ function promptAndRecordResult() {
   // 最初にユーザー入力を受け付け
   const winnerResponse = ui.prompt(
     '対戦結果の記録',
-    '勝者のプレイヤーIDの**数字部分のみ**を入力してください (例: P001なら「1」)。\n敗者は「対戦中」シートから自動特定されます。',
+    '勝者のプレイヤーIDの**数字部分のみ**を入力してください (例: P001なら「1」)。\n敗者は「${SHEET_IN_PROGRESS}」シートから自動特定されます。',
     ui.ButtonSet.OK_CANCEL
   );
 
@@ -150,7 +150,7 @@ function promptAndRecordResult() {
   }
 
   if (loserId === null) {
-    ui.alert(`エラー: 勝者ID (${formattedWinnerId}) は「対戦中」シートに見つかりませんでした。\n入力IDが間違っているか、対戦が記録されていません。`);
+    ui.alert(`エラー: 勝者ID (${formattedWinnerId}) は「${SHEET_IN_PROGRESS}」シートに見つかりませんでした。\n入力IDが間違っているか、対戦が記録されていません。`);
     return;
   }
 

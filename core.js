@@ -158,8 +158,8 @@ function promptAndRecordResult() {
   const confirmResponse = ui.alert(
     '対戦結果の確認',
     `以下の内容で記録してよろしいですか？\n\n` +
-    `勝者: ${formattedWinnerId}\n` +
-    `敗者: ${loserId}`,
+    `勝者: ${getPlayerName(formattedWinnerId)}\n` +
+    `敗者: ${getPlayerName(loserId)}`,
     ui.ButtonSet.YES_NO
   );
 

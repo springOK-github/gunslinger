@@ -12,6 +12,7 @@ const ID_DIGITS = 3; // IDの数字部分の桁数 (例: P001なら3)
 const PLAYER_STATUS = {
   WAITING: "待機",
   IN_PROGRESS: "対戦中",
+  RESTING: "休憩",
   DROPPED: "終了"
 };
 // 卓に関する設定

@@ -14,6 +14,7 @@ function onOpen() {
     .addSeparator()
     .addItem('プレイヤー登録', 'registerPlayer')
     .addItem('対戦結果の記録', 'promptAndRecordResult')
+    .addItem('🔧 対戦結果の修正', 'correctMatchResult')
     .addSeparator()
     .addItem('プレイヤーを休憩にする', 'setPlayerResting')
     .addItem('休憩から復帰させる', 'returnPlayerFromResting')

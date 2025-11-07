@@ -86,11 +86,11 @@ function setupSheets() {
 function getMaxTables() {
   const properties = PropertiesService.getDocumentProperties();
   const savedMaxTables = properties.getProperty('MAX_TABLES');
-  
+
   if (savedMaxTables) {
     return parseInt(savedMaxTables, 10);
   }
-  
+
   // デフォルト値
   return TABLE_CONFIG.MAX_TABLES;
 }
@@ -111,7 +111,7 @@ function setMaxTables(maxTables) {
 function configureMaxTables() {
   const ui = SpreadsheetApp.getUi();
   const currentMaxTables = getMaxTables();
-  
+
   const response = ui.prompt(
     '最大卓数の設定',
     `現在の最大卓数: ${currentMaxTables}卓\n\n` +
@@ -155,7 +155,7 @@ function configureMaxTables() {
 
   // 設定を保存
   setMaxTables(newMaxTables);
-  
+
   ui.alert(
     '設定完了',
     `最大卓数を ${newMaxTables}卓 に設定しました。`,
@@ -179,7 +179,7 @@ const LOCK_TIMEOUT = 30000; // 30秒
 function acquireLock(lockName) {
   const lock = LockService.getScriptLock();
   const success = lock.tryLock(LOCK_TIMEOUT);
-  
+
   if (!success) {
     throw new Error(
       '他のユーザーが操作中です。\n' +
@@ -187,7 +187,7 @@ function acquireLock(lockName) {
       `(${lockName})`
     );
   }
-  
+
   return lock;
 }
 

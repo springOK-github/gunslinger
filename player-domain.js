@@ -17,7 +17,7 @@ function registerPlayer() {
   const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
   const ui = SpreadsheetApp.getUi();
   let lock = null;
-  
+
   try {
     lock = acquireLock('プレイヤー登録');
     getSheetStructure(playerSheet, SHEET_PLAYERS);
@@ -184,7 +184,7 @@ function getWaitingPlayers() {
     const { indices, data } = getSheetStructure(playerSheet, SHEET_PLAYERS);
     if (data.length <= 1) return [];
 
-    const waiting = data.slice(1).filter(row => 
+    const waiting = data.slice(1).filter(row =>
       row[indices["参加状況"]] === PLAYER_STATUS.WAITING
     );
 
@@ -310,14 +310,14 @@ function updatePlayerState(options) {
     // 1. プレイヤーの現在の状態を確認
     const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
     const { indices: playerIndices, data: playerData } = getSheetStructure(playerSheet, SHEET_PLAYERS);
-    
+
     let targetFound = false;
     let currentStatus = null;
 
     for (let i = 1; i < playerData.length; i++) {
       const row = playerData[i];
       const playerId = row[playerIndices["プレイヤーID"]];
-      
+
       if (playerId === targetPlayerId) {
         targetFound = true;
         currentStatus = row[playerIndices["参加状況"]];

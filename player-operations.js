@@ -108,12 +108,14 @@ function returnPlayerFromResting() {
 
     let found = false;
     let currentStatus = null;
+    let targetRowIndex = -1;
 
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
       if (row[indices["プレイヤーID"]] === playerId) {
         found = true;
         currentStatus = row[indices["参加状況"]];
+        targetRowIndex = i + 1;
         break;
       }
     }
@@ -141,14 +143,8 @@ function returnPlayerFromResting() {
     }
 
     // 状態を待機に変更
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      if (row[indices["プレイヤーID"]] === playerId) {
-        playerSheet.getRange(i + 1, indices["参加状況"] + 1)
-          .setValue(PLAYER_STATUS.WAITING);
-        break;
-      }
-    }
+    playerSheet.getRange(targetRowIndex, indices["参加状況"] + 1)
+      .setValue(PLAYER_STATUS.WAITING);
 
     ui.alert('完了', `プレイヤー ${playerId} を待機状態に復帰させました。`, ui.ButtonSet.OK);
 

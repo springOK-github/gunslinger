@@ -37,16 +37,15 @@ function updatePlayerState(options) {
     const { indices: playerIndices, data: playerData } = getSheetStructure(playerSheet, SHEET_PLAYERS);
     
     let targetFound = false;
-    let targetDropped = false;
+    let currentStatus = null;
 
     for (let i = 1; i < playerData.length; i++) {
       const row = playerData[i];
       const playerId = row[playerIndices["プレイヤーID"]];
-      const status = row[playerIndices["参加状況"]];
       
       if (playerId === targetPlayerId) {
         targetFound = true;
-        targetDropped = status === PLAYER_STATUS.DROPPED;
+        currentStatus = row[playerIndices["参加状況"]];
         break;
       }
     }
@@ -55,18 +54,8 @@ function updatePlayerState(options) {
       return { success: false, message: `プレイヤー ${targetPlayerId} が見つかりません。` };
     }
 
-    if (targetDropped) {
+    if (currentStatus === PLAYER_STATUS.DROPPED) {
       return { success: false, message: `プレイヤー ${targetPlayerId} はすでにドロップアウトしています。` };
-    }
-
-    // 2. プレイヤーの現在の状態を取得
-    let currentStatus = null;
-    for (let i = 1; i < playerData.length; i++) {
-      const row = playerData[i];
-      if (row[playerIndices["プレイヤーID"]] === targetPlayerId) {
-        currentStatus = row[playerIndices["参加状況"]];
-        break;
-      }
     }
 
     // 3. 対戦中の場合のみ、対戦相手の処理

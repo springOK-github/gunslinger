@@ -1,16 +1,20 @@
 /**
  * ポケモンカード・ガンスリンガーバトル用マッチングシステム
- * @fileoverview スプレッドシートの操作に関するユーティリティ関数
+ * @fileoverview 共有ユーティリティ - シート操作とUI共通処理
  * @author SpringOK
  */
 
+// =========================================
+// シート操作ユーティリティ
+// =========================================
+
 /**
- * シートのヘッダーを検証し、列インデックスを返します。
- * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet - 検証対象のシート
- * @param {string} sheetName - シート名（SHEET_PLAYERS等の定数）
- * @returns {{headers: string[], indices: Object.<string, number>, data: any[][]}} ヘッダー情報と全データ
- * @throws {Error} 必須ヘッダーが不足している場合
+ * シートの構造を取得し、ヘッダー行の検証を行います。
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet 対象のシート
+ * @param {string} sheetName シート名（定数から取得）
+ * @returns {Object} { headers: 配列, indices: オブジェクト, data: 2次元配列 }
  */
+
 function getSheetStructure(sheet, sheetName) {
   if (!sheet) {
     throw new Error(`シート「${sheetName}」が見つかりません。`);
@@ -148,4 +152,74 @@ function getLastTableNumber(playerId) {
     }
   }
   return null;
+}
+
+// =========================================
+// UI共通ユーティリティ
+// =========================================
+
+/**
+ * プレイヤーIDの入力を受け付ける共通関数
+ * @param {string} title - プロンプトのタイトル
+ * @param {string} message - プロンプトのメッセージ
+ * @returns {string|null} 整形されたプレイヤーID、キャンセル時はnull
+ */
+function promptPlayerId(title, message) {
+  const ui = SpreadsheetApp.getUi();
+
+  const response = ui.prompt(title, message, ui.ButtonSet.OK_CANCEL);
+
+  if (response.getSelectedButton() !== ui.Button.OK) {
+    ui.alert('処理をキャンセルしました。');
+    return null;
+  }
+
+  const rawId = response.getResponseText().trim();
+
+  if (!/^\d+$/.test(rawId)) {
+    ui.alert('エラー: IDは数字のみで入力してください。');
+    return null;
+  }
+
+  return PLAYER_ID_PREFIX + Utilities.formatString(`%0${ID_DIGITS}d`, parseInt(rawId, 10));
+}
+
+/**
+ * プレイヤーの状態を変更する共通処理
+ * @param {Object} config - 設定オブジェクト
+ * @param {string} config.actionName - アクション名（例: "ドロップアウト"）
+ * @param {string} config.promptMessage - 入力プロンプトのメッセージ
+ * @param {string} config.confirmMessage - 確認ダイアログのメッセージ
+ * @param {string} config.newStatus - 新しい状態
+ */
+function changePlayerStatus(config) {
+  const ui = SpreadsheetApp.getUi();
+
+  const playerId = promptPlayerId(config.actionName, config.promptMessage);
+  if (!playerId) return;
+
+  const confirmResponse = ui.alert(
+    config.actionName + 'の確認',
+    `プレイヤー ${playerId} \n` + config.confirmMessage + '\n\nよろしいですか？',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (confirmResponse !== ui.Button.YES) {
+    ui.alert('処理をキャンセルしました。');
+    return;
+  }
+
+  // 共通処理を呼び出し
+  const result = updatePlayerState({
+    targetPlayerId: playerId,
+    newStatus: config.newStatus,
+    opponentNewStatus: PLAYER_STATUS.WAITING,
+    recordResult: false
+  });
+
+  if (!result.success) {
+    ui.alert('エラー', result.message, ui.ButtonSet.OK);
+    return;
+  }
+
 }

@@ -8,9 +8,13 @@ Google Apps Script (GAS) ベースのポケモンカードバトル大会マッ�
 
 - **constants.js**: システム全体の定数定義（シート名、ステータス、卓設定）
 - **setup.js**: 初期化とカスタムメニュー（`onOpen()` トリガー）
+- **config.js**: システム設定の管理（最大卓数の取得・設定）
 - **match-manager.js**: マッチングロジックと対戦結果記録
-- **player-manager.js**: プレイヤーのライフサイクル管理（登録・ドロップアウト）
+- **player-operations.js**: プレイヤーのUI操作（登録・休憩・復帰・ドロップアウト）
+- **player-queries.js**: プレイヤーデータの取得と検索
+- **player-stats.js**: プレイヤー統計の更新処理
 - **player-state.js**: 状態遷移の共通処理（`updatePlayerState()` が中核）
+- **ui-utils.js**: UI操作の共通ユーティリティ
 - **sheet-utils.js**: スプレッドシート操作の抽象化
 - **lock-utils.js**: 排他制御（`acquireLock()` / `releaseLock()`）
 - **test-utils.js**: テストデータ生成

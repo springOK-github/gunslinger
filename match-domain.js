@@ -56,8 +56,12 @@ function matchPlayers() {
       opponentsMap.get(p2).add(p1);
     }
 
-    // 待機プレイヤーを取得
-    const waitingPlayers = getWaitingPlayers();
+    // 待機プレイヤーを取得（playerDataから直接抽出）
+    const waitingPlayers = playerData.filter((row, idx) => {
+      // ヘッダー行は除外
+      if (idx === 0) return false;
+      return row[playerIndices["参加状況"]] === PLAYER_STATUS.WAITING;
+    });
     if (waitingPlayers.length < 2) {
       Logger.log(`警告: 現在待機中のプレイヤーは ${waitingPlayers.length} 人です。2人以上必要です。`);
       return;

@@ -1,7 +1,7 @@
 /**
  * ポケモンカード・ガンスリンガーバトル用マッチングシステム
  * @fileoverview テスト用のユーティリティ関数
- * @author SpringOK
+ * @author springOK
  */
 
 // テスト設定

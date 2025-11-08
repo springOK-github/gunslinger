@@ -215,13 +215,13 @@ git pull origin main
 
 ## 作者
 
-SpringOK
+springOK
 
 ## ライセンス
 
 MIT License
 
-Copyright (c) 2025 SpringOK
+Copyright (c) 2025 springOK
 
 このソフトウェアはMITライセンスの下で公開されています。
 詳細は [LICENSE](LICENSE) ファイルを参照してください。

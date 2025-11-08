@@ -1,7 +1,7 @@
 /**
  * ポケモンカード・ガンスリンガーバトル用マッチングシステム
  * @fileoverview システム概要と構成の説明
- * @author SpringOK
+ * @author springOK
  *
  * @description
  * Google Apps Script (GAS) とスプレッドシートで動作する

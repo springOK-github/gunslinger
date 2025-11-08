@@ -1,7 +1,7 @@
 /**
  * ポケモンカード・ガンスリンガーバトル用マッチングシステム
  * @fileoverview システム全体で使用する定数の定義
- * @author SpringOK
+ * @author springOK
  */
 
 const SHEET_PLAYERS = "プレイヤー";

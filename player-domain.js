@@ -32,16 +32,42 @@ function registerPlayer() {
       return;
     }
 
-    const playerName = response.getResponseText().trim();
+    // 既存の最大ID番号を取得
+    const { indices, data } = getSheetStructure(playerSheet, SHEET_PLAYERS);
+    let maxIdNumber = 0;
+
+    for (let i = 1; i < data.length; i++) {
+      const playerId = data[i][indices["プレイヤーID"]];
+      if (playerId && playerId.startsWith(PLAYER_ID_PREFIX)) {
+        const idNumber = parseInt(playerId.substring(PLAYER_ID_PREFIX.length), 10);
+        if (!isNaN(idNumber) && idNumber > maxIdNumber) {
+          maxIdNumber = idNumber;
+        }
+      }
+    }
+
+    const newIdNumber = maxIdNumber + 1;
+    const newId = PLAYER_ID_PREFIX + Utilities.formatString(`%0${ID_DIGITS}d`, newIdNumber);
+
+    // プレイヤー名が空の場合はIDを使用
+    let playerName = response.getResponseText().trim();
     if (!playerName) {
-      ui.alert('エラー', 'プレイヤー名を入力してください。', ui.ButtonSet.OK);
+      playerName = newId;
+    }
+
+    // 名前確認ダイアログ
+
+    const confirmResponse = ui.alert(
+      '登録確認',
+      `プレイヤー名: ${playerName}\nプレイヤーID: ${newId}\n\nこの内容で登録しますか？`,
+      ui.ButtonSet.YES_NO);
+
+    if (confirmResponse == ui.Button.NO) {
+      Logger.log('プレイヤー登録が確認段階でキャンセルされました。');
       return;
     }
 
-    const lastRow = playerSheet.getLastRow();
-    const newIdNumber = lastRow;
     const currentTime = new Date();
-    const newId = PLAYER_ID_PREFIX + Utilities.formatString(`%0${ID_DIGITS}d`, newIdNumber);
     const formattedTime = Utilities.formatDate(currentTime, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
 
     playerSheet.appendRow([newId, playerName, 0, 0, 0, PLAYER_STATUS.WAITING, formattedTime]);

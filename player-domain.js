@@ -421,14 +421,14 @@ function updatePlayerState(options) {
       const matchTableNumber = inProgressSheet.getRange(matchRow, 1).getValue();
 
       historySheet.appendRow([
+        newId,
         formattedTime,
         matchTableNumber,
         winner,
         winnerName,
         loser,
         loserName,
-        winnerName,
-        newId
+        winnerName
       ]);
 
       updatePlayerMatchStats(winner, true, formattedTime);

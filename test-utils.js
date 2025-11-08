@@ -22,7 +22,8 @@ function registerTestPlayers() {
     const newId = PLAYER_ID_PREFIX + Utilities.formatString(`%0${ID_DIGITS}d`, newIdNumber);
     // 登録順を保証するため、登録日時を1秒ずつずらす
     const registrationDate = new Date(baseDate.getTime() + i * 1000);
-    playerSheet.appendRow([newId, newId, 0, 0, 0, PLAYER_STATUS.WAITING, registrationDate]);
+    const formattedTime = Utilities.formatDate(registrationDate, 'Asia/Tokyo', 'MM/dd HH:mm');
+    playerSheet.appendRow([newId, newId, 0, 0, 0, PLAYER_STATUS.WAITING, formattedTime]);
   }
 
   const waitingPlayersCount = getWaitingPlayers().length;

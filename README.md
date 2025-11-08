@@ -219,4 +219,9 @@ SpringOK
 
 ## ライセンス
 
-このプロジェクトは非公開です。無断での使用、配布、複製は禁止されています。
+MIT License
+
+Copyright (c) 2025 SpringOK
+
+このソフトウェアはMITライセンスの下で公開されています。
+詳細は [LICENSE](LICENSE) ファイルを参照してください。

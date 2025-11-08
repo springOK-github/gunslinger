@@ -198,9 +198,12 @@ function changePlayerStatus(config) {
   const playerId = promptPlayerId(config.actionName, config.promptMessage);
   if (!playerId) return;
 
+  // プレイヤー名を取得
+  const playerName = getPlayerName(playerId);
+
   const confirmResponse = ui.alert(
     config.actionName + 'の確認',
-    `プレイヤー ${playerId} \n` + config.confirmMessage + '\n\nよろしいですか？',
+    `プレイヤー名: ${playerName}\nプレイヤーID: ${playerId}\n\n` + config.confirmMessage + '\n\nよろしいですか？',
     ui.ButtonSet.YES_NO
   );
 

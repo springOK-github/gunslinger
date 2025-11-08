@@ -106,7 +106,7 @@ function dropoutPlayer() {
  * プレイヤーを休憩状態にします。
  * 待機中または対戦中から休憩に遷移できます。
  */
-function setPlayerResting() {
+function restPlayer() {
   changePlayerStatus({
     actionName: 'プレイヤーの休憩',
     promptMessage: '休憩するプレイヤーIDの**数字部分のみ**を入力してください (例: P001なら「1」)。',
@@ -138,6 +138,7 @@ function returnPlayerFromResting() {
 
     let found = false;
     let currentStatus = null;
+    let playerName = null;
     let targetRowIndex = -1;
 
     for (let i = 1; i < data.length; i++) {
@@ -145,6 +146,7 @@ function returnPlayerFromResting() {
       if (row[indices["プレイヤーID"]] === playerId) {
         found = true;
         currentStatus = row[indices["参加状況"]];
+        playerName = row[indices["プレイヤー名"]];
         targetRowIndex = i + 1;
         break;
       }
@@ -156,14 +158,13 @@ function returnPlayerFromResting() {
     }
 
     if (currentStatus !== PLAYER_STATUS.RESTING) {
-      ui.alert('エラー', `プレイヤー ${playerId} は休憩中ではありません（現在: ${currentStatus}）。`, ui.ButtonSet.OK);
+      ui.alert('エラー', `プレイヤー名: ${playerName}\nプレイヤーID: ${playerId}\n\n休憩中ではありません（現在: ${currentStatus}）。`, ui.ButtonSet.OK);
       return;
     }
 
     const confirmResponse = ui.alert(
       '復帰の確認',
-      `プレイヤー ${playerId} を休憩から待機状態に復帰させます。\n\n` +
-      'よろしいですか？',
+      `プレイヤー名: ${playerName}\nプレイヤーID: ${playerId}\n\n休憩から待機状態に復帰させます。\n\nよろしいですか？`,
       ui.ButtonSet.YES_NO
     );
 

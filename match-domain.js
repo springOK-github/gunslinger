@@ -65,17 +65,6 @@ function matchPlayers() {
 
     // マッチング結果の反映
     if (matches.length > 0) {
-      // プレイヤーの状態を更新
-      const playerIdsToUpdate = matches.flat();
-      for (let i = 1; i < playerData.length; i++) {
-        const row = playerData[i];
-        const playerId = row[playerIndices["プレイヤーID"]];
-        if (playerIdsToUpdate.includes(playerId)) {
-          playerSheet.getRange(i + 1, playerIndices["参加状況"] + 1)
-            .setValue(PLAYER_STATUS.IN_PROGRESS);
-        }
-      }
-
       // マッチングシートの現在の状態を取得
       const { indices: matchIndices, data: matchData } = getSheetStructure(inProgressSheet, SHEET_IN_PROGRESS);
 
@@ -96,8 +85,42 @@ function matchPlayers() {
         }
       }
 
+      // 利用可能な卓数を計算
+      const maxTables = getMaxTables();
+      const totalExistingTables = availableTables.length + usedTables.size;
+      const maxNewTables = Math.max(0, maxTables - totalExistingTables);
+      const totalAvailableSlots = availableTables.length + maxNewTables;
+
+      Logger.log(`[デバッグ] 卓数情報: 最大=${maxTables}, 空き=${availableTables.length}, 使用中=${usedTables.size}, 既存合計=${totalExistingTables}, 新規作成可能=${maxNewTables}, 利用可能スロット=${totalAvailableSlots}`);
+      Logger.log(`[デバッグ] マッチング候補数: ${matches.length}組`);
+
+      // 卓数制限を考慮してマッチング数を制限
+      const actualMatches = matches.slice(0, totalAvailableSlots);
+      const skippedMatches = matches.slice(totalAvailableSlots);
+
+      if (skippedMatches.length > 0) {
+        Logger.log(`警告: 卓数上限により ${skippedMatches.length} 組のマッチングを見送りました。`);
+        // 見送られたプレイヤーをskippedPlayersに追加
+        for (const match of skippedMatches) {
+          const [p1Id, p2Id] = match;
+          Logger.log(`見送り: ${p1Id} vs ${p2Id}`);
+        }
+      }
+
+      // 実際にマッチングするプレイヤーのみ状態を更新
+      const playerIdsToUpdate = actualMatches.flat();
+      for (let i = 1; i < playerData.length; i++) {
+        const row = playerData[i];
+        const playerId = row[playerIndices["プレイヤーID"]];
+        if (playerIdsToUpdate.includes(playerId)) {
+          playerSheet.getRange(i + 1, playerIndices["参加状況"] + 1)
+            .setValue(PLAYER_STATUS.IN_PROGRESS);
+        }
+      }
+
       // マッチを卓に割り当て
-      for (const match of matches) {
+      let nextNewRow = matchData.length;  // 新規行のカウンター
+      for (const match of actualMatches) {
         const [p1Id, p2Id] = match;
         let targetRow = null;
         let tableNumber = null;
@@ -129,7 +152,8 @@ function matchPlayers() {
             // 新しい卓を作成
             const newTableNumber = getNextAvailableTableNumber(inProgressSheet);
             tableNumber = newTableNumber;
-            targetRow = matchData.length;
+            targetRow = nextNewRow;
+            nextNewRow++;  // 次の新規行をインクリメント
             // 新しい卓番号を設定
             inProgressSheet.getRange(targetRow + 1, 1).setValue(tableNumber);
           }
@@ -145,8 +169,8 @@ function matchPlayers() {
         ]]);
       }
 
-      Logger.log(`マッチングが ${matches.length} 件成立しました。「${SHEET_IN_PROGRESS}」シートを確認してください。`);
-      return matches.length;
+      Logger.log(`マッチングが ${actualMatches.length} 件成立しました。「${SHEET_IN_PROGRESS}」シートを確認してください。`);
+      return actualMatches.length;
     } else {
       Logger.log("警告: 新しいマッチングは成立しませんでした。");
       return 0;

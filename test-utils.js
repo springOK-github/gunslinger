@@ -16,10 +16,13 @@ function registerTestPlayers() {
   }
 
   const numTestPlayers = 8;
+  const baseDate = new Date();
   for (let i = 0; i < numTestPlayers; i++) {
     const newIdNumber = i + 1;
     const newId = PLAYER_ID_PREFIX + Utilities.formatString(`%0${ID_DIGITS}d`, newIdNumber);
-    playerSheet.appendRow([newId, 0, 0, 0, PLAYER_STATUS.WAITING, new Date()]);
+    // 登録順を保証するため、登録日時を1秒ずつずらす
+    const registrationDate = new Date(baseDate.getTime() + i * 1000);
+    playerSheet.appendRow([newId, newId, 0, 0, 0, PLAYER_STATUS.WAITING, registrationDate]);
   }
 
   const waitingPlayersCount = getWaitingPlayers().length;

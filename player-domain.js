@@ -193,7 +193,7 @@ function getWaitingPlayers() {
 
       const dateA = a[indices["最終対戦日時"]] instanceof Date ? a[indices["最終対戦日時"]].getTime() : 0;
       const dateB = b[indices["最終対戦日時"]] instanceof Date ? b[indices["最終対戦日時"]].getTime() : 0;
-      return dateB - dateA;
+      return dateA - dateB;  // 古い日時が先（登録順・先着順）
     });
 
     return waiting;

@@ -235,7 +235,7 @@ function getWaitingPlayers() {
 // =========================================
 
 /**
- * プレイヤーの統計情報 (勝数, 敗数, 消化試合数) と最終対戦日時を更新します。
+ * プレイヤーの統計情報 (勝数, 敗数, 試合数) と最終対戦日時を更新します。
  */
 function updatePlayerMatchStats(playerId, isWinner, timestamp) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -251,13 +251,13 @@ function updatePlayerMatchStats(playerId, isWinner, timestamp) {
         const rowNum = i + 1;
         const currentWins = parseInt(row[indices["勝数"]]) || 0;
         const currentLosses = parseInt(row[indices["敗数"]]) || 0;
-        const currentTotal = parseInt(row[indices["消化試合数"]]) || 0;
+        const currentTotal = parseInt(row[indices["試合数"]]) || 0;
 
         playerSheet.getRange(rowNum, indices["勝数"] + 1)
           .setValue(currentWins + (isWinner ? 1 : 0));
         playerSheet.getRange(rowNum, indices["敗数"] + 1)
           .setValue(currentLosses + (isWinner ? 0 : 1));
-        playerSheet.getRange(rowNum, indices["消化試合数"] + 1)
+        playerSheet.getRange(rowNum, indices["試合数"] + 1)
           .setValue(currentTotal + 1);
         playerSheet.getRange(rowNum, indices["最終対戦日時"] + 1)
           .setValue(timestamp);

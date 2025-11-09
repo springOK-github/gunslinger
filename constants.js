@@ -21,8 +21,9 @@ const TABLE_CONFIG = {
   MIN_TABLE_NUMBER: 1  // 最小卓番号
 };
 
+// 各シートの必須ヘッダー定義
 const REQUIRED_HEADERS = {
-  [SHEET_PLAYERS]: ["プレイヤーID", "プレイヤー名", "勝数", "敗数", "消化試合数", "参加状況", "最終対戦日時"],
+  [SHEET_PLAYERS]: ["プレイヤーID", "プレイヤー名", "勝数", "敗数", "試合数", "参加状況", "最終対戦日時"],
   [SHEET_HISTORY]: ["対戦ID", "日時", "卓番号", "ID1", "プレイヤー1", "ID2", "プレイヤー2", "勝者名"],
   [SHEET_IN_PROGRESS]: ["卓番号", "ID1", "プレイヤー1", "ID2", "プレイヤー2"]
 };

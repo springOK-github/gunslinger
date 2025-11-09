@@ -92,6 +92,32 @@ function validateTableNumber(tableNumber) {
 }
 
 /**
+ * 現在使用中の最大卓番号を取得します
+ * @returns {number} 使用中の最大卓番号（使用中の卓がない場合は0）
+ */
+function getMaxUsedTableNumber() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
+
+  if (!inProgressSheet) {
+    return 0;
+  }
+
+  const { indices, data } = getSheetStructure(inProgressSheet, SHEET_IN_PROGRESS);
+  let maxUsed = 0;
+
+  // 現在使用中の卓番号から最大値を取得
+  for (let i = 1; i < data.length; i++) {
+    const tableNumber = data[i][indices["卓番号"]];
+    if (tableNumber && tableNumber > maxUsed) {
+      maxUsed = tableNumber;
+    }
+  }
+
+  return maxUsed;
+}
+
+/**
  * 使用可能な次の卓番号を取得します
  * @param {GoogleAppsScript.Spreadsheet.Sheet} inProgressSheet マッチングシート
  * @returns {number} 使用可能な次の卓番号

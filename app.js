@@ -139,6 +139,19 @@ function configureMaxTables() {
     return;
   }
 
+  // 使用中の卓がある場合、それより小さい値には減らせない
+  const maxUsedTable = getMaxUsedTableNumber();
+  if (newMaxTables < maxUsedTable) {
+    ui.alert(
+      'エラー',
+      `現在、卓番号 ${maxUsedTable} まで使用中です。\n\n` +
+      `使用中の卓番号より小さい値には減らせません。\n` +
+      `最小値: ${maxUsedTable}卓`,
+      ui.ButtonSet.OK
+    );
+    return;
+  }
+
   // 確認ダイアログ
   const confirmResponse = ui.alert(
     '設定の確認',

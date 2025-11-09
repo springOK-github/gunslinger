@@ -1,4 +1,4 @@
-# Gunslinger - Pokémon Card Tournament Matching System
+# Gunslinger - Tournament Matching System
 
 **開発者向けドキュメント**
 

@@ -13,7 +13,7 @@
  */
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
-  ui.createMenu('🃏 ポケモンマッチング')
+  ui.createMenu('🃏 ガンスリンガーマッチング')
     .addItem('⚙️ シートの初期設定', 'setupSheets')
     .addSeparator()
     .addItem('➕ プレイヤーを追加する', 'registerPlayer')

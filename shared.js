@@ -69,10 +69,6 @@ function getPlayerName(playerId) {
 }
 
 /**
- * 「マッチング」シート内の空行の処理。
- * 卓番号制の導入により、空行は削除せず維持します。
- */
-/**
  * 卓番号が有効かどうかを検証します
  * @param {number} tableNumber 検証する卓番号
  * @returns {{isValid: boolean, message: string}} 検証結果とメッセージ

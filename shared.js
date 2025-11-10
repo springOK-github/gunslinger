@@ -25,7 +25,7 @@ function getSheetStructure(sheet, sheetName) {
     throw new Error(`シート「${sheetName}」にデータがありません。`);
   }
 
-  const headers = data[0].map(h => String(h).trim());
+  const headers = data[0].map((h) => String(h).trim());
   const indices = {};
   const missing = [];
 
@@ -34,7 +34,7 @@ function getSheetStructure(sheet, sheetName) {
     throw new Error(`シート「${sheetName}」の必須ヘッダー定義が見つかりません。`);
   }
 
-  requiredHeaders.forEach(required => {
+  requiredHeaders.forEach((required) => {
     const idx = headers.indexOf(required);
     if (idx === -1) {
       missing.push(required);
@@ -187,14 +187,14 @@ function promptPlayerId(title, message) {
   const response = ui.prompt(title, message, ui.ButtonSet.OK_CANCEL);
 
   if (response.getSelectedButton() !== ui.Button.OK) {
-    ui.alert('処理をキャンセルしました。');
+    ui.alert("処理をキャンセルしました。");
     return null;
   }
 
   const rawId = response.getResponseText().trim();
 
   if (!/^\d+$/.test(rawId)) {
-    ui.alert('エラー: IDは数字のみで入力してください。');
+    ui.alert("エラー: IDは数字のみで入力してください。");
     return null;
   }
 
@@ -219,13 +219,13 @@ function changePlayerStatus(config) {
   const playerName = getPlayerName(playerId);
 
   const confirmResponse = ui.alert(
-    config.actionName + 'の確認',
-    `プレイヤー名: ${playerName}\nプレイヤーID: ${playerId}\n\n` + config.confirmMessage + '\n\nよろしいですか？',
+    config.actionName + "の確認",
+    `プレイヤー名: ${playerName}\nプレイヤーID: ${playerId}\n\n` + config.confirmMessage + "\n\nよろしいですか？",
     ui.ButtonSet.YES_NO
   );
 
   if (confirmResponse !== ui.Button.YES) {
-    ui.alert('処理をキャンセルしました。');
+    ui.alert("処理をキャンセルしました。");
     return;
   }
 
@@ -234,12 +234,11 @@ function changePlayerStatus(config) {
     targetPlayerId: playerId,
     newStatus: config.newStatus,
     opponentNewStatus: PLAYER_STATUS.WAITING,
-    recordResult: false
+    recordResult: false,
   });
 
   if (!result.success) {
-    ui.alert('エラー', result.message, ui.ButtonSet.OK);
+    ui.alert("エラー", result.message, ui.ButtonSet.OK);
     return;
   }
-
 }

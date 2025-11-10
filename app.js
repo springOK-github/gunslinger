@@ -13,18 +13,18 @@
  */
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
-  ui.createMenu('🃏 ガンスリンガーマッチング')
-    .addItem('⚙️ シートの初期設定', 'setupSheets')
+  ui.createMenu("🃏 ガンスリンガーマッチング")
+    .addItem("⚙️ シートの初期設定", "setupSheets")
     .addSeparator()
-    .addItem('➕ プレイヤーを追加する', 'registerPlayer')
-    .addItem('☕ プレイヤーを休憩にする', 'restPlayer')
-    .addItem('↩️ 休憩から復帰させる', 'returnPlayerFromResting')
-    .addItem('❌ プレイヤーをドロップアウトさせる', 'dropoutPlayer')
+    .addItem("➕ プレイヤーを追加する", "registerPlayer")
+    .addItem("☕ プレイヤーを休憩にする", "restPlayer")
+    .addItem("↩️ 休憩から復帰させる", "returnPlayerFromResting")
+    .addItem("❌ プレイヤーをドロップアウトさせる", "dropoutPlayer")
     .addSeparator()
-    .addItem('✅ 対戦結果の記録', 'promptAndRecordResult')
-    .addItem('🔧 対戦結果の修正', 'correctMatchResult')
+    .addItem("✅ 対戦結果の記録", "promptAndRecordResult")
+    .addItem("🔧 対戦結果の修正", "correctMatchResult")
     .addSeparator()
-    .addItem('⚙️ 最大卓数の設定', 'configureMaxTables')
+    .addItem("⚙️ 最大卓数の設定", "configureMaxTables")
     .addToUi();
 }
 
@@ -41,8 +41,12 @@ function setupSheets() {
   }
   playerSheet.clear();
   const playerHeaders = REQUIRED_HEADERS[SHEET_PLAYERS];
-  playerSheet.getRange(1, 1, 1, playerHeaders.length).setValues([playerHeaders])
-    .setFontWeight("bold").setBackground("#c9daf8").setHorizontalAlignment("center");
+  playerSheet
+    .getRange(1, 1, 1, playerHeaders.length)
+    .setValues([playerHeaders])
+    .setFontWeight("bold")
+    .setBackground("#c9daf8")
+    .setHorizontalAlignment("center");
   // 幅の調整
   playerSheet.setColumnWidth(1, 100);
   playerSheet.setColumnWidth(5, 100);
@@ -55,8 +59,12 @@ function setupSheets() {
   }
   historySheet.clear();
   const historyHeaders = REQUIRED_HEADERS[SHEET_HISTORY];
-  historySheet.getRange(1, 1, 1, historyHeaders.length).setValues([historyHeaders])
-    .setFontWeight("bold").setBackground("#fce5cd").setHorizontalAlignment("center");
+  historySheet
+    .getRange(1, 1, 1, historyHeaders.length)
+    .setValues([historyHeaders])
+    .setFontWeight("bold")
+    .setBackground("#fce5cd")
+    .setHorizontalAlignment("center");
   historySheet.setColumnWidth(1, 150);
 
   // 3. マッチングシート
@@ -66,8 +74,12 @@ function setupSheets() {
   }
   inProgressSheet.clear();
   const inProgressHeaders = REQUIRED_HEADERS[SHEET_IN_PROGRESS];
-  inProgressSheet.getRange(1, 1, 1, inProgressHeaders.length).setValues([inProgressHeaders])
-    .setFontWeight("bold").setBackground("#d9ead3").setHorizontalAlignment("center");
+  inProgressSheet
+    .getRange(1, 1, 1, inProgressHeaders.length)
+    .setValues([inProgressHeaders])
+    .setFontWeight("bold")
+    .setBackground("#d9ead3")
+    .setHorizontalAlignment("center");
   inProgressSheet.setColumnWidth(3, 80);
 
   Logger.log("シートの初期設定が完了しました。");
@@ -84,7 +96,7 @@ function setupSheets() {
  */
 function getMaxTables() {
   const properties = PropertiesService.getDocumentProperties();
-  const savedMaxTables = properties.getProperty('MAX_TABLES');
+  const savedMaxTables = properties.getProperty("MAX_TABLES");
 
   if (savedMaxTables) {
     return parseInt(savedMaxTables, 10);
@@ -100,7 +112,7 @@ function getMaxTables() {
  */
 function setMaxTables(maxTables) {
   const properties = PropertiesService.getDocumentProperties();
-  properties.setProperty('MAX_TABLES', maxTables.toString());
+  properties.setProperty("MAX_TABLES", maxTables.toString());
   Logger.log(`最大卓数を ${maxTables} に設定しました。`);
 }
 
@@ -112,14 +124,13 @@ function configureMaxTables() {
   const currentMaxTables = getMaxTables();
 
   const response = ui.prompt(
-    '最大卓数の設定',
-    `現在の最大卓数: ${currentMaxTables}卓\n\n` +
-    `新しい最大卓数を入力してください（1～200）：`,
+    "最大卓数の設定",
+    `現在の最大卓数: ${currentMaxTables}卓\n\n` + `新しい最大卓数を入力してください（1～200）：`,
     ui.ButtonSet.OK_CANCEL
   );
 
   if (response.getSelectedButton() !== ui.Button.OK) {
-    ui.alert('設定をキャンセルしました。');
+    ui.alert("設定をキャンセルしました。");
     return;
   }
 
@@ -127,7 +138,7 @@ function configureMaxTables() {
 
   // 入力検証
   if (!/^\d+$/.test(input)) {
-    ui.alert('エラー', '数字のみで入力してください。', ui.ButtonSet.OK);
+    ui.alert("エラー", "数字のみで入力してください。", ui.ButtonSet.OK);
     return;
   }
 
@@ -135,7 +146,7 @@ function configureMaxTables() {
 
   // 範囲検証
   if (newMaxTables < 1 || newMaxTables > 200) {
-    ui.alert('エラー', '最大卓数は1～200の範囲で入力してください。', ui.ButtonSet.OK);
+    ui.alert("エラー", "最大卓数は1～200の範囲で入力してください。", ui.ButtonSet.OK);
     return;
   }
 
@@ -143,10 +154,8 @@ function configureMaxTables() {
   const maxUsedTable = getMaxUsedTableNumber();
   if (newMaxTables < maxUsedTable) {
     ui.alert(
-      'エラー',
-      `現在、卓番号 ${maxUsedTable} まで使用中です。\n\n` +
-      `使用中の卓番号より小さい値には減らせません。\n` +
-      `最小値: ${maxUsedTable}卓`,
+      "エラー",
+      `現在、卓番号 ${maxUsedTable} まで使用中です。\n\n` + `使用中の卓番号より小さい値には減らせません。\n` + `最小値: ${maxUsedTable}卓`,
       ui.ButtonSet.OK
     );
     return;
@@ -154,25 +163,20 @@ function configureMaxTables() {
 
   // 確認ダイアログ
   const confirmResponse = ui.alert(
-    '設定の確認',
-    `最大卓数を ${currentMaxTables}卓 → ${newMaxTables}卓 に変更します。\n\n` +
-    'よろしいですか？',
+    "設定の確認",
+    `最大卓数を ${currentMaxTables}卓 → ${newMaxTables}卓 に変更します。\n\n` + "よろしいですか？",
     ui.ButtonSet.YES_NO
   );
 
   if (confirmResponse !== ui.Button.YES) {
-    ui.alert('設定をキャンセルしました。');
+    ui.alert("設定をキャンセルしました。");
     return;
   }
 
   // 設定を保存
   setMaxTables(newMaxTables);
 
-  ui.alert(
-    '設定完了',
-    `最大卓数を ${newMaxTables}卓 に設定しました。`,
-    ui.ButtonSet.OK
-  );
+  ui.alert("設定完了", `最大卓数を ${newMaxTables}卓 に設定しました。`, ui.ButtonSet.OK);
 }
 
 // =========================================
@@ -193,11 +197,7 @@ function acquireLock(lockName) {
   const success = lock.tryLock(LOCK_TIMEOUT);
 
   if (!success) {
-    throw new Error(
-      '他のユーザーが操作中です。\n' +
-      'しばらく待ってから再度お試しください。\n' +
-      `(${lockName})`
-    );
+    throw new Error("他のユーザーが操作中です。\n" + "しばらく待ってから再度お試しください。\n" + `(${lockName})`);
   }
 
   return lock;
@@ -212,7 +212,7 @@ function releaseLock(lock) {
     try {
       lock.releaseLock();
     } catch (e) {
-      Logger.log('ロックの解放に失敗: ' + e.toString());
+      Logger.log("ロックの解放に失敗: " + e.toString());
     }
   }
 }

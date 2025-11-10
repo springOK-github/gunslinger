@@ -19,16 +19,13 @@ function registerPlayer() {
   let lock = null;
 
   try {
-    lock = acquireLock('プレイヤー登録');
+    lock = acquireLock("プレイヤー登録");
     getSheetStructure(playerSheet, SHEET_PLAYERS);
 
-    const response = ui.prompt(
-      'プレイヤー登録',
-      'プレイヤー名を入力してください：',
-      ui.ButtonSet.OK_CANCEL);
+    const response = ui.prompt("プレイヤー登録", "プレイヤー名を入力してください：", ui.ButtonSet.OK_CANCEL);
 
     if (response.getSelectedButton() == ui.Button.CANCEL) {
-      Logger.log('プレイヤー登録がキャンセルされました。');
+      Logger.log("プレイヤー登録がキャンセルされました。");
       return;
     }
 
@@ -57,18 +54,15 @@ function registerPlayer() {
 
     // 名前確認ダイアログ
 
-    const confirmResponse = ui.alert(
-      '登録確認',
-      `プレイヤー名: ${playerName}\nプレイヤーID: ${newId}\n\nこの内容で登録しますか？`,
-      ui.ButtonSet.YES_NO);
+    const confirmResponse = ui.alert("登録確認", `プレイヤー名: ${playerName}\nプレイヤーID: ${newId}\n\nこの内容で登録しますか？`, ui.ButtonSet.YES_NO);
 
     if (confirmResponse == ui.Button.NO) {
-      Logger.log('プレイヤー登録が確認段階でキャンセルされました。');
+      Logger.log("プレイヤー登録が確認段階でキャンセルされました。");
       return;
     }
 
     const currentTime = new Date();
-    const formattedTime = Utilities.formatDate(currentTime, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
+    const formattedTime = Utilities.formatDate(currentTime, "Asia/Tokyo", "yyyy/MM/dd HH:mm:ss");
 
     playerSheet.appendRow([newId, playerName, 0, 0, 0, PLAYER_STATUS.WAITING, formattedTime]);
     Logger.log(`プレイヤー ${newId} を登録しました。`);
@@ -83,8 +77,7 @@ function registerPlayer() {
   } catch (e) {
     ui.alert("エラーが発生しました: " + e.toString());
     Logger.log("registerPlayer エラー: " + e.toString());
-  }
-  finally {
+  } finally {
     releaseLock(lock);
   }
 }
@@ -95,10 +88,10 @@ function registerPlayer() {
  */
 function dropoutPlayer() {
   changePlayerStatus({
-    actionName: 'プレイヤーのドロップアウト',
-    promptMessage: 'ドロップアウトするプレイヤーIDの**数字部分のみ**を入力してください (例: P001なら「1」)。',
-    confirmMessage: 'をドロップアウトさせます。\n進行中の対戦がある場合は無効となります。',
-    newStatus: PLAYER_STATUS.DROPPED
+    actionName: "プレイヤーのドロップアウト",
+    promptMessage: "ドロップアウトするプレイヤーIDの**数字部分のみ**を入力してください (例: P001なら「1」)。",
+    confirmMessage: "をドロップアウトさせます。\n進行中の対戦がある場合は無効となります。",
+    newStatus: PLAYER_STATUS.DROPPED,
   });
 }
 
@@ -108,9 +101,9 @@ function dropoutPlayer() {
  */
 function restPlayer() {
   changePlayerStatus({
-    actionName: 'プレイヤーの休憩',
-    promptMessage: '休憩するプレイヤーIDの**数字部分のみ**を入力してください (例: P001なら「1」)。',
-    confirmMessage: 'を休憩状態にします。\n進行中の対戦がある場合は無効となります。',
+    actionName: "プレイヤーの休憩",
+    promptMessage: "休憩するプレイヤーIDの**数字部分のみ**を入力してください (例: P001なら「1」)。",
+    confirmMessage: "を休憩状態にします。\n進行中の対戦がある場合は無効となります。",
     newStatus: PLAYER_STATUS.RESTING,
   });
 }
@@ -121,10 +114,7 @@ function restPlayer() {
 function returnPlayerFromResting() {
   const ui = SpreadsheetApp.getUi();
 
-  const playerId = promptPlayerId(
-    '休憩からの復帰',
-    '復帰するプレイヤーIDの**数字部分のみ**を入力してください (例: P001なら「1」)。'
-  );
+  const playerId = promptPlayerId("休憩からの復帰", "復帰するプレイヤーIDの**数字部分のみ**を入力してください (例: P001なら「1」)。");
   if (!playerId) return;
 
   // プレイヤーの現在の状態を確認
@@ -133,7 +123,7 @@ function returnPlayerFromResting() {
   let lock = null;
 
   try {
-    lock = acquireLock('休憩からの復帰');
+    lock = acquireLock("休憩からの復帰");
     const { indices, data } = getSheetStructure(playerSheet, SHEET_PLAYERS);
 
     let found = false;
@@ -153,30 +143,28 @@ function returnPlayerFromResting() {
     }
 
     if (!found) {
-      ui.alert('エラー', `プレイヤー ${playerId} が見つかりません。`, ui.ButtonSet.OK);
+      ui.alert("エラー", `プレイヤー ${playerId} が見つかりません。`, ui.ButtonSet.OK);
       return;
     }
 
     if (currentStatus !== PLAYER_STATUS.RESTING) {
-      ui.alert('エラー', `プレイヤー名: ${playerName}\nプレイヤーID: ${playerId}\n\n休憩中ではありません（現在: ${currentStatus}）。`, ui.ButtonSet.OK);
+      ui.alert("エラー", `プレイヤー名: ${playerName}\nプレイヤーID: ${playerId}\n\n休憩中ではありません（現在: ${currentStatus}）。`, ui.ButtonSet.OK);
       return;
     }
 
     const confirmResponse = ui.alert(
-      '復帰の確認',
+      "復帰の確認",
       `プレイヤー名: ${playerName}\nプレイヤーID: ${playerId}\n\n休憩から待機状態に復帰させます。\n\nよろしいですか？`,
       ui.ButtonSet.YES_NO
     );
 
     if (confirmResponse !== ui.Button.YES) {
-      ui.alert('処理をキャンセルしました。');
+      ui.alert("処理をキャンセルしました。");
       return;
     }
 
     // 状態を待機に変更
-    playerSheet.getRange(targetRowIndex, indices["参加状況"] + 1)
-      .setValue(PLAYER_STATUS.WAITING);
-
+    playerSheet.getRange(targetRowIndex, indices["参加状況"] + 1).setValue(PLAYER_STATUS.WAITING);
 
     // 待機者が2人以上いれば自動マッチング
     const waitingPlayersCount = getWaitingPlayers().length;
@@ -184,7 +172,6 @@ function returnPlayerFromResting() {
       Logger.log(`復帰後、待機プレイヤーが ${waitingPlayersCount} 人いるため、自動でマッチングを開始します。`);
       matchPlayers();
     }
-
   } catch (e) {
     ui.alert("エラーが発生しました: " + e.toString());
     Logger.log("returnPlayerFromResting エラー: " + e.toString());
@@ -210,9 +197,7 @@ function getWaitingPlayers() {
     const { indices, data } = getSheetStructure(playerSheet, SHEET_PLAYERS);
     if (data.length <= 1) return [];
 
-    const waiting = data.slice(1).filter(row =>
-      row[indices["参加状況"]] === PLAYER_STATUS.WAITING
-    );
+    const waiting = data.slice(1).filter((row) => row[indices["参加状況"]] === PLAYER_STATUS.WAITING);
 
     waiting.sort((a, b) => {
       const winsDiff = b[indices["勝数"]] - a[indices["勝数"]];
@@ -220,7 +205,7 @@ function getWaitingPlayers() {
 
       const dateA = a[indices["最終対戦日時"]] instanceof Date ? a[indices["最終対戦日時"]].getTime() : 0;
       const dateB = b[indices["最終対戦日時"]] instanceof Date ? b[indices["最終対戦日時"]].getTime() : 0;
-      return dateA - dateB;  // 古い日時が先（登録順・先着順）
+      return dateA - dateB; // 古い日時が先（登録順・先着順）
     });
 
     return waiting;
@@ -253,14 +238,10 @@ function updatePlayerMatchStats(playerId, isWinner, timestamp) {
         const currentLosses = parseInt(row[indices["敗数"]]) || 0;
         const currentTotal = parseInt(row[indices["試合数"]]) || 0;
 
-        playerSheet.getRange(rowNum, indices["勝数"] + 1)
-          .setValue(currentWins + (isWinner ? 1 : 0));
-        playerSheet.getRange(rowNum, indices["敗数"] + 1)
-          .setValue(currentLosses + (isWinner ? 0 : 1));
-        playerSheet.getRange(rowNum, indices["試合数"] + 1)
-          .setValue(currentTotal + 1);
-        playerSheet.getRange(rowNum, indices["最終対戦日時"] + 1)
-          .setValue(timestamp);
+        playerSheet.getRange(rowNum, indices["勝数"] + 1).setValue(currentWins + (isWinner ? 1 : 0));
+        playerSheet.getRange(rowNum, indices["敗数"] + 1).setValue(currentLosses + (isWinner ? 0 : 1));
+        playerSheet.getRange(rowNum, indices["試合数"] + 1).setValue(currentTotal + 1);
+        playerSheet.getRange(rowNum, indices["最終対戦日時"] + 1).setValue(timestamp);
 
         return;
       }
@@ -286,13 +267,7 @@ function updatePlayerMatchStats(playerId, isWinner, timestamp) {
  * @returns {Object} 処理結果 { success: boolean, message: string, opponentId?: string }
  */
 function updatePlayerState(options) {
-  const {
-    targetPlayerId,
-    newStatus,
-    opponentNewStatus,
-    recordResult = false,
-    isTargetWinner = false
-  } = options;
+  const { targetPlayerId, newStatus, opponentNewStatus, recordResult = false, isTargetWinner = false } = options;
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let matchLock = null;
@@ -300,8 +275,8 @@ function updatePlayerState(options) {
 
   try {
     // 両方のロックを取得（順序を固定して デッドロック防止）
-    stateLock = acquireLock('プレイヤー状態変更');
-    matchLock = acquireLock('対戦結果の記録');
+    stateLock = acquireLock("プレイヤー状態変更");
+    matchLock = acquireLock("対戦結果の記録");
 
     // 1. プレイヤーの現在の状態を確認
     const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
@@ -375,7 +350,7 @@ function updatePlayerState(options) {
     // 4. 結果の記録（必要な場合）
     if (recordResult) {
       const currentTime = new Date();
-      const formattedTime = Utilities.formatDate(currentTime, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
+      const formattedTime = Utilities.formatDate(currentTime, "Asia/Tokyo", "yyyy/MM/dd HH:mm:ss");
       const historySheet = ss.getSheetByName(SHEET_HISTORY);
       getSheetStructure(historySheet, SHEET_HISTORY);
       const newId = "T" + Utilities.formatString("%04d", historySheet.getLastRow());
@@ -390,16 +365,7 @@ function updatePlayerState(options) {
       const { indices: matchIndices } = getSheetStructure(inProgressSheet, SHEET_IN_PROGRESS);
       const matchTableNumber = inProgressSheet.getRange(matchRow, 1).getValue();
 
-      historySheet.appendRow([
-        newId,
-        formattedTime,
-        matchTableNumber,
-        winner,
-        winnerName,
-        loser,
-        loserName,
-        winnerName
-      ]);
+      historySheet.appendRow([newId, formattedTime, matchTableNumber, winner, winnerName, loser, loserName, winnerName]);
 
       updatePlayerMatchStats(winner, true, formattedTime);
       updatePlayerMatchStats(loser, false, formattedTime);
@@ -416,11 +382,9 @@ function updatePlayerState(options) {
       const row = playerData[i];
       const playerId = row[playerIndices["プレイヤーID"]];
       if (playerId === targetPlayerId) {
-        playerSheet.getRange(i + 1, playerIndices["参加状況"] + 1)
-          .setValue(newStatus);
+        playerSheet.getRange(i + 1, playerIndices["参加状況"] + 1).setValue(newStatus);
       } else if (playerId === opponentId) {
-        playerSheet.getRange(i + 1, playerIndices["参加状況"] + 1)
-          .setValue(opponentNewStatus);
+        playerSheet.getRange(i + 1, playerIndices["参加状況"] + 1).setValue(opponentNewStatus);
       }
     }
 
@@ -433,14 +397,13 @@ function updatePlayerState(options) {
     return {
       success: true,
       message: "状態変更が完了しました。",
-      opponentId
+      opponentId,
     };
-
   } catch (e) {
     Logger.log("handleMatchStateChange エラー: " + e.message);
     return {
       success: false,
-      message: "エラーが発生しました: " + e.toString()
+      message: "エラーが発生しました: " + e.toString(),
     };
   } finally {
     releaseLock(matchLock);

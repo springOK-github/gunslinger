@@ -6,7 +6,7 @@
 
 // テスト設定
 const TEST_CONFIG = {
-  NUM_PLAYERS: 8  // 登録するテストプレイヤー数（この値を変更して調整）
+  NUM_PLAYERS: 8, // 登録するテストプレイヤー数（この値を変更して調整）
 };
 
 /**
@@ -20,7 +20,7 @@ function registerTestPlayers() {
   let lock = null;
 
   try {
-    lock = acquireLock('テストプレイヤー登録');
+    lock = acquireLock("テストプレイヤー登録");
     const { indices, data } = getSheetStructure(playerSheet, SHEET_PLAYERS);
 
     // 既存の最大ID番号を取得（本物のregisterPlayer()と同じロジック）
@@ -41,9 +41,9 @@ function registerTestPlayers() {
     for (let i = 0; i < numPlayers; i++) {
       const newIdNumber = maxIdNumber + i + 1;
       const newId = PLAYER_ID_PREFIX + Utilities.formatString(`%0${ID_DIGITS}d`, newIdNumber);
-      const playerName = newId;  // 名前はIDと同じ
+      const playerName = newId; // 名前はIDと同じ
       const currentTime = new Date();
-      const formattedTime = Utilities.formatDate(currentTime, 'Asia/Tokyo', 'yyyy/MM/dd HH:mm:ss');
+      const formattedTime = Utilities.formatDate(currentTime, "Asia/Tokyo", "yyyy/MM/dd HH:mm:ss");
 
       playerSheet.appendRow([newId, playerName, 0, 0, 0, PLAYER_STATUS.WAITING, formattedTime]);
       Logger.log(`プレイヤー ${playerName} (${newId}) を登録しました。`);
@@ -57,7 +57,6 @@ function registerTestPlayers() {
     } else {
       Logger.log(`テストプレイヤー登録完了。待機プレイヤーが ${waitingPlayersCount} 人です。`);
     }
-
   } catch (e) {
     Logger.log("registerTestPlayers エラー: " + e.toString());
   } finally {

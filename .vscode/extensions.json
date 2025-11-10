@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "xabikos.javascriptsnippets",
+    "ms-vscode.vscode-typescript-next",
+    "mgmcdermott.vscode-language-babel",
+    "dbaeumer.vscode-eslint",
+    "editorconfig.editorconfig",
+    "esbenp.prettier-vscode"
+  ]
+}

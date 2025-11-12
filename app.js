@@ -189,6 +189,9 @@ function setupMatchTimeUpdaterTrigger() {
 
   // 新しいトリガーを作成（1分ごと）
   ScriptApp.newTrigger("updateAllMatchTimes").timeBased().everyMinutes(1).create();
+
+  // 初回実行
+  updateAllMatchTimes();
 }
 
 /**

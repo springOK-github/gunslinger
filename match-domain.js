@@ -201,7 +201,11 @@ function matchPlayers() {
           usedTables.add(tableNumber);
         }
 
-        inProgressSheet.getRange(targetRow + 1, 2, 1, 4).setValues([[p1Id, playerNameMap.get(p1Id) || p1Id, p2Id, playerNameMap.get(p2Id) || p2Id]]);
+        inProgressSheet
+          .getRange(targetRow + 1, 2, 1, 6)
+          .setValues([
+            [p1Id, playerNameMap.get(p1Id) || p1Id, p2Id, playerNameMap.get(p2Id) || p2Id, Utilities.formatDate(new Date(), "Asia/Tokyo", "HH:mm:ss"), 0],
+          ]);
       }
 
       Logger.log(`マッチングが ${actualMatches.length} 件成立しました。「${SHEET_IN_PROGRESS}」シートを確認してください。`);
@@ -438,5 +442,41 @@ function correctMatchResult() {
     Logger.log("correctMatchResult エラー: " + e.toString());
   } finally {
     releaseLock(lock);
+  }
+}
+
+// =========================================
+// 対戦時間更新
+// =========================================
+
+/**
+ * 全卓の対戦時間を現在時刻に基づいて更新します。
+ */
+function updateAllMatchTimes() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
+  const { indices, data } = getSheetStructure(inProgressSheet, SHEET_IN_PROGRESS);
+
+  let updatedCount = 0;
+  const currentTime = new Date();
+  let matchLock = null;
+
+  try {
+    matchLock = acquireLock("対戦結果の記録");
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const startTime = new Date(row[indices["対戦開始日時"]]);
+      // 対戦開始日時が存在する場合のみ更新
+      if (startTime.toString() !== "Invalid Date") {
+        const elapsedMs = currentTime.getTime() - startTime.getTime();
+        const elapsedDate = new Date(elapsedMs);
+        const formattedElapsed = Utilities.formatDate(elapsedDate, "Asia/Tokyo", "mm:ss");
+        inProgressSheet.getRange(i + 1, indices["経過時間"] + 1).setValue(formattedElapsed);
+        updatedCount++;
+      }
+    }
+    Logger.log(`対戦時間が ${updatedCount} 卓分更新されました。`);
+  } finally {
+    releaseLock(matchLock);
   }
 }

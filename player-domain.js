@@ -363,9 +363,11 @@ function updatePlayerState(options) {
       // マッチング中の卓番号を取得
       const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
       const { indices: matchIndices } = getSheetStructure(inProgressSheet, SHEET_IN_PROGRESS);
-      const matchTableNumber = inProgressSheet.getRange(matchRow, 1).getValue();
+      const matchTableNumber = inProgressSheet.getRange(matchRow, matchIndices["卓番号"] + 1).getValue();
+      const startTime = inProgressSheet.getRange(matchRow, matchIndices["対戦開始日時"] + 1).getValue();
+      const diffTime = Utilities.formatDate(new Date(currentTime.getTime() - startTime.getTime()), "Asia/Tokyo", "mm:ss");
 
-      historySheet.appendRow([newId, formattedTime, matchTableNumber, winner, winnerName, loser, loserName, winnerName]);
+      historySheet.appendRow([newId, formattedTime, matchTableNumber, winner, winnerName, loser, loserName, winnerName, diffTime]);
 
       updatePlayerMatchStats(winner, true, formattedTime);
       updatePlayerMatchStats(loser, false, formattedTime);
@@ -374,7 +376,7 @@ function updatePlayerState(options) {
     // 5. 対戦情報をクリア（対戦中の場合のみ）。卓番号は残す
     if (currentStatus === PLAYER_STATUS.IN_PROGRESS && matchRow !== -1) {
       const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
-      inProgressSheet.getRange(matchRow, 2, 1, 4).clearContent(); // ID1からID2までをクリア
+      inProgressSheet.getRange(matchRow, 2, 1, 6).clearContent(); // ID1から対戦時間までをクリア
     }
 
     // 6. プレイヤーの状態を更新

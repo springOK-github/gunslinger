@@ -16,6 +16,9 @@ function onOpen() {
   ui.createMenu("🃏 ガンスリンガーマッチング")
     .addItem("⚙️ シートの初期設定", "setupSheets")
     .addSeparator()
+    .addItem("⏱️ 対戦時間計測タイマーの開始", "setupMatchTimeUpdaterTrigger")
+    .addItem("⏹️ 対戦時間計測タイマーの停止", "deleteMatchTimeUpdaterTrigger")
+    .addSeparator()
     .addItem("➕ プレイヤーを追加する", "registerPlayer")
     .addItem("☕ プレイヤーを休憩にする", "restPlayer")
     .addItem("↩️ 休憩から復帰させる", "returnPlayerFromResting")
@@ -33,6 +36,9 @@ function onOpen() {
  */
 function setupSheets() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // 対戦時間計測トリガーを削除
+  deleteMatchTimeUpdaterTrigger();
 
   // 1. プレイヤーシート
   let playerSheet = ss.getSheetByName(SHEET_PLAYERS);
@@ -171,6 +177,31 @@ function configureMaxTables() {
   setMaxTables(newMaxTables);
 
   ui.alert("設定完了", `最大卓数を ${newMaxTables}卓 に設定しました。`, ui.ButtonSet.OK);
+}
+
+/**
+ * updateAllMatchTimesを1分周期でGASトリガーと仕掛けます。
+ */
+
+function setupMatchTimeUpdaterTrigger() {
+  // 既存のトリガーを削除
+  deleteMatchTimeUpdaterTrigger();
+
+  // 新しいトリガーを作成（1分ごと）
+  ScriptApp.newTrigger("updateAllMatchTimes").timeBased().everyMinutes(1).create();
+}
+
+/**
+ * トリガーを削除します
+ */
+
+function deleteMatchTimeUpdaterTrigger() {
+  const triggers = ScriptApp.getProjectTriggers();
+  for (const trigger of triggers) {
+    if (trigger.getHandlerFunction() === "updateAllMatchTimes") {
+      ScriptApp.deleteTrigger(trigger);
+    }
+  }
 }
 
 // =========================================

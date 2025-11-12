@@ -16,8 +16,8 @@ function onOpen() {
   ui.createMenu("🃏 ガンスリンガーマッチング")
     .addItem("⚙️ シートの初期設定", "setupSheets")
     .addSeparator()
-    .addItem("⏱️ 対戦時間計測タイマーの開始", "setupMatchTimeUpdaterTrigger")
-    .addItem("⏹️ 対戦時間計測タイマーの停止", "deleteMatchTimeUpdaterTrigger")
+    .addItem("⏱️ 経過時間更新の開始", "setupMatchTimeUpdaterTrigger")
+    .addItem("⏹️ 経過時間更新の停止", "deleteMatchTimeUpdaterTrigger")
     .addSeparator()
     .addItem("➕ プレイヤーを追加する", "registerPlayer")
     .addItem("☕ プレイヤーを休憩にする", "restPlayer")
@@ -218,22 +218,34 @@ function setupMatchTimeUpdaterTrigger() {
  */
 
 function deleteMatchTimeUpdaterTrigger(showAlert = true) {
-  if (showAlert) {
-    // 確認するダイアログを表示
-    const ui = SpreadsheetApp.getUi();
-    const response = ui.alert("対戦時間計測タイマーの停止", "対戦時間計測タイマーを停止しますか？", ui.ButtonSet.YES_NO);
-
-    if (response !== ui.Button.YES) {
-      ui.alert("タイマーの停止をキャンセルしました。");
-      return;
-    }
-  }
-
   // 既存のトリガーを削除
   const triggers = ScriptApp.getProjectTriggers();
+  if (triggers.length === 0 && showAlert) {
+    const ui = SpreadsheetApp.getUi();
+    ui.alert("タイマーは既に停止されています。", ui.ButtonSet.OK);
+    return;
+  }
   for (const trigger of triggers) {
     if (trigger.getHandlerFunction() === "updateAllMatchTimes") {
+      if (showAlert) {
+        // 確認するダイアログを表示
+        const ui = SpreadsheetApp.getUi();
+        const response = ui.alert("対戦時間計測タイマーの停止", "対戦時間計測タイマーを停止しますか？", ui.ButtonSet.YES_NO);
+
+        if (response !== ui.Button.YES) {
+          ui.alert("タイマーの停止をキャンセルしました。");
+          return;
+        }
+      }
+      showAlert = false; // 一度表示したら表示しない
+
       ScriptApp.deleteTrigger(trigger);
+    } else {
+      // メッセージ
+      if (showAlert) {
+        const ui = SpreadsheetApp.getUi();
+        ui.alert("タイマーは既に停止されています。", ui.ButtonSet.OK);
+      }
     }
   }
 }

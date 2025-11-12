@@ -367,7 +367,7 @@ function updatePlayerState(options) {
       const startTime = inProgressSheet.getRange(matchRow, matchIndices["対戦開始時刻"] + 1).getValue();
       const diffTime = Utilities.formatDate(new Date(currentTime.getTime() - startTime.getTime()), "Asia/Tokyo", "mm:ss");
 
-      historySheet.appendRow([newId, formattedTime, matchTableNumber, winner, winnerName, loser, loserName, winnerName, diffTime]);
+      historySheet.appendRow([newId, matchTableNumber, winner, winnerName, loser, loserName, winnerName, formattedTime, diffTime]);
 
       updatePlayerMatchStats(winner, true, formattedTime);
       updatePlayerMatchStats(loser, false, formattedTime);

@@ -47,10 +47,6 @@ function setupSheets() {
     .setFontWeight("bold")
     .setBackground("#c9daf8")
     .setHorizontalAlignment("center");
-  // 幅の調整
-  playerSheet.setColumnWidth(1, 100);
-  playerSheet.setColumnWidth(5, 100);
-  playerSheet.setColumnWidth(6, 150);
 
   // 2. 対戦履歴シート
   let historySheet = ss.getSheetByName(SHEET_HISTORY);
@@ -65,7 +61,6 @@ function setupSheets() {
     .setFontWeight("bold")
     .setBackground("#fce5cd")
     .setHorizontalAlignment("center");
-  historySheet.setColumnWidth(1, 150);
 
   // 3. マッチングシート
   let inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
@@ -80,7 +75,6 @@ function setupSheets() {
     .setFontWeight("bold")
     .setBackground("#d9ead3")
     .setHorizontalAlignment("center");
-  inProgressSheet.setColumnWidth(3, 80);
 
   Logger.log("シートの初期設定が完了しました。");
 }

@@ -37,8 +37,17 @@ function onOpen() {
 function setupSheets() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
+  // 確認メッセージを表示
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.alert("シートの初期設定", "シートの初期設定を行いますか？\n\n既存のデータはすべて削除されます。", ui.ButtonSet.YES_NO);
+
+  if (response !== ui.Button.YES) {
+    ui.alert("シートの初期設定をキャンセルしました。");
+    return;
+  }
+
   // 対戦時間計測トリガーを削除
-  deleteMatchTimeUpdaterTrigger();
+  deleteMatchTimeUpdaterTrigger(false);
 
   // 1. プレイヤーシート
   let playerSheet = ss.getSheetByName(SHEET_PLAYERS);
@@ -184,8 +193,17 @@ function configureMaxTables() {
  */
 
 function setupMatchTimeUpdaterTrigger() {
+  // 確認するダイアログを表示
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.alert("対戦時間計測タイマーの開始", "対戦時間計測タイマーを開始しますか？", ui.ButtonSet.YES_NO);
+
+  if (response !== ui.Button.YES) {
+    ui.alert("タイマーの開始をキャンセルしました。");
+    return;
+  }
+
   // 既存のトリガーを削除
-  deleteMatchTimeUpdaterTrigger();
+  deleteMatchTimeUpdaterTrigger(false);
 
   // 新しいトリガーを作成（1分ごと）
   ScriptApp.newTrigger("updateAllMatchTimes").timeBased().everyMinutes(1).create();
@@ -196,9 +214,22 @@ function setupMatchTimeUpdaterTrigger() {
 
 /**
  * トリガーを削除します
+ * @param {boolean} showAlert - ユーザーに完了メッセージを表示するかどうか
  */
 
-function deleteMatchTimeUpdaterTrigger() {
+function deleteMatchTimeUpdaterTrigger(showAlert = true) {
+  if (showAlert) {
+    // 確認するダイアログを表示
+    const ui = SpreadsheetApp.getUi();
+    const response = ui.alert("対戦時間計測タイマーの停止", "対戦時間計測タイマーを停止しますか？", ui.ButtonSet.YES_NO);
+
+    if (response !== ui.Button.YES) {
+      ui.alert("タイマーの停止をキャンセルしました。");
+      return;
+    }
+  }
+
+  // 既存のトリガーを削除
   const triggers = ScriptApp.getProjectTriggers();
   for (const trigger of triggers) {
     if (trigger.getHandlerFunction() === "updateAllMatchTimes") {

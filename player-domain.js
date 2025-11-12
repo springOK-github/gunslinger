@@ -187,7 +187,7 @@ function returnPlayerFromResting() {
 /**
  * 待機中のプレイヤーを抽出し、以下の優先順位でソートして返します。
  * 1. 勝数（降順）
- * 2. 最終対戦日時（降順 = 最近待機に戻った人優先 = 直近の勝者優先）
+ * 2. 最終対戦時刻（降順 = 最近待機に戻った人優先 = 直近の勝者優先）
  */
 function getWaitingPlayers() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -203,9 +203,9 @@ function getWaitingPlayers() {
       const winsDiff = b[indices["勝数"]] - a[indices["勝数"]];
       if (winsDiff !== 0) return winsDiff;
 
-      const dateA = a[indices["最終対戦日時"]] instanceof Date ? a[indices["最終対戦日時"]].getTime() : 0;
-      const dateB = b[indices["最終対戦日時"]] instanceof Date ? b[indices["最終対戦日時"]].getTime() : 0;
-      return dateA - dateB; // 古い日時が先（登録順・先着順）
+      const dateA = a[indices["最終対戦時刻"]] instanceof Date ? a[indices["最終対戦時刻"]].getTime() : 0;
+      const dateB = b[indices["最終対戦時刻"]] instanceof Date ? b[indices["最終対戦時刻"]].getTime() : 0;
+      return dateA - dateB; // 古い時刻が先（登録順・先着順）
     });
 
     return waiting;
@@ -220,7 +220,7 @@ function getWaitingPlayers() {
 // =========================================
 
 /**
- * プレイヤーの統計情報 (勝数, 敗数, 試合数) と最終対戦日時を更新します。
+ * プレイヤーの統計情報 (勝数, 敗数, 試合数) と最終対戦時刻を更新します。
  */
 function updatePlayerMatchStats(playerId, isWinner, timestamp) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -241,7 +241,7 @@ function updatePlayerMatchStats(playerId, isWinner, timestamp) {
         playerSheet.getRange(rowNum, indices["勝数"] + 1).setValue(currentWins + (isWinner ? 1 : 0));
         playerSheet.getRange(rowNum, indices["敗数"] + 1).setValue(currentLosses + (isWinner ? 0 : 1));
         playerSheet.getRange(rowNum, indices["試合数"] + 1).setValue(currentTotal + 1);
-        playerSheet.getRange(rowNum, indices["最終対戦日時"] + 1).setValue(timestamp);
+        playerSheet.getRange(rowNum, indices["最終対戦時刻"] + 1).setValue(timestamp);
 
         return;
       }
@@ -350,7 +350,7 @@ function updatePlayerState(options) {
     // 4. 結果の記録（必要な場合）
     if (recordResult) {
       const currentTime = new Date();
-      const formattedTime = Utilities.formatDate(currentTime, "Asia/Tokyo", "yyyy/MM/dd HH:mm:ss");
+      const formattedTime = Utilities.formatDate(currentTime, "Asia/Tokyo", "HH:mm:ss");
       const historySheet = ss.getSheetByName(SHEET_HISTORY);
       getSheetStructure(historySheet, SHEET_HISTORY);
       const newId = "T" + Utilities.formatString("%04d", historySheet.getLastRow());
@@ -364,7 +364,7 @@ function updatePlayerState(options) {
       const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
       const { indices: matchIndices } = getSheetStructure(inProgressSheet, SHEET_IN_PROGRESS);
       const matchTableNumber = inProgressSheet.getRange(matchRow, matchIndices["卓番号"] + 1).getValue();
-      const startTime = inProgressSheet.getRange(matchRow, matchIndices["対戦開始日時"] + 1).getValue();
+      const startTime = inProgressSheet.getRange(matchRow, matchIndices["対戦開始時刻"] + 1).getValue();
       const diffTime = Utilities.formatDate(new Date(currentTime.getTime() - startTime.getTime()), "Asia/Tokyo", "mm:ss");
 
       historySheet.appendRow([newId, formattedTime, matchTableNumber, winner, winnerName, loser, loserName, winnerName, diffTime]);

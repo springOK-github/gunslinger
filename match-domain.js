@@ -65,8 +65,8 @@ function matchPlayers() {
         if (winsDiff !== 0) return winsDiff;
 
         // 勝数が同じ場合は、登録/最終対戦が古い順（昇順 = 先着順）
-        const dateA = a[playerIndices["最終対戦日時"]] instanceof Date ? a[playerIndices["最終対戦日時"]].getTime() : 0;
-        const dateB = b[playerIndices["最終対戦日時"]] instanceof Date ? b[playerIndices["最終対戦日時"]].getTime() : 0;
+        const dateA = a[playerIndices["最終対戦時刻"]] instanceof Date ? a[playerIndices["最終対戦時刻"]].getTime() : 0;
+        const dateB = b[playerIndices["最終対戦時刻"]] instanceof Date ? b[playerIndices["最終対戦時刻"]].getTime() : 0;
         return dateA - dateB;
       });
 
@@ -465,8 +465,8 @@ function updateAllMatchTimes() {
     matchLock = acquireLock("対戦結果の記録");
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
-      const startTime = new Date(row[indices["対戦開始日時"]]);
-      // 対戦開始日時が存在する場合のみ更新
+      const startTime = new Date(row[indices["対戦開始時刻"]]);
+      // 対戦開始時刻が存在する場合のみ更新
       if (startTime.toString() !== "Invalid Date") {
         const elapsedMs = currentTime.getTime() - startTime.getTime();
         const elapsedDate = new Date(elapsedMs);

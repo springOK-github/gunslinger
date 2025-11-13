@@ -204,7 +204,14 @@ function matchPlayers() {
         inProgressSheet
           .getRange(targetRow + 1, 2, 1, 6)
           .setValues([
-            [p1Id, playerNameMap.get(p1Id) || p1Id, p2Id, playerNameMap.get(p2Id) || p2Id, Utilities.formatDate(new Date(), "Asia/Tokyo", "HH:mm:ss"), 0],
+            [
+              p1Id,
+              playerNameMap.get(p1Id) || p1Id,
+              p2Id,
+              playerNameMap.get(p2Id) || p2Id,
+              Utilities.formatDate(new Date(), "Asia/Tokyo", "yyyy/MM/dd HH:mm:ss"),
+              0,
+            ],
           ]);
       }
 

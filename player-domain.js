@@ -350,7 +350,7 @@ function updatePlayerState(options) {
     // 4. 結果の記録（必要な場合）
     if (recordResult) {
       const currentTime = new Date();
-      const formattedTime = Utilities.formatDate(currentTime, "Asia/Tokyo", "HH:mm:ss");
+      const formattedTime = Utilities.formatDate(currentTime, "Asia/Tokyo", "yyyy/MM/dd HH:mm:ss");
       const historySheet = ss.getSheetByName(SHEET_HISTORY);
       getSheetStructure(historySheet, SHEET_HISTORY);
       const newId = "T" + Utilities.formatString("%04d", historySheet.getLastRow());

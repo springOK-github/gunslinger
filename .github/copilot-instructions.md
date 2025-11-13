@@ -32,6 +32,10 @@ Google Apps Script (GAS) ベースのガンスリンガー方式マッチング�
 -   **shared.js**: 共有ユーティリティ
     -   シート操作: `getSheetStructure()`, `getPlayerName()`, 卓番号管理
     -   UI 共通処理: `promptPlayerId()`, `changePlayerStatus()`
+    -   新規ヘルパー（実装差分）:
+        -   `formatElapsedMs(elapsedMs)` — 経過ミリ秒を HH:mm:ss 形式で返すフォーマッタ。GAS の Date/Utilities.formatDate を経由した表示で生じるタイムゾーンズレを避ける目的で導入しています（経過時間はミリ秒差から直接算出することを基本にしています）。
+        -   `getMaxUsedTableNumber()` — マッチングシート上で現在使用中の最大卓番号を返します。`configureMaxTables()` の検証で利用されています。
+        -   `getNextAvailableTableNumber(inProgressSheet)` — 使用中の卓番号をスキャンして空き番号を返す既存ロジックの補助。
 
 #### アプリケーション層
 
@@ -121,6 +125,11 @@ try {
 -   対戦結果記録後（`updatePlayerState()` → 最後に `matchPlayers()` 呼び出し）
 -   テストプレイヤー登録後（`registerTestPlayers()`）
 
+追加の実装差分（経過時間更新）:
+
+-   `updateAllMatchTimes()` — マッチングシート上の対戦開始時刻からミリ秒差を算出し、`formatElapsedMs()` を使って `経過時間` 列を HH:mm:ss 表示で更新します。従来の Date を経由したフォーマットで時刻ズレが出ていたため、ミリ秒 → 文字列のヘルパーを導入しました。
+-   メニュー/トリガー関係: `setupMatchTimeUpdaterTrigger()` と `deleteMatchTimeUpdaterTrigger()` を `app.js` に追加し、1 分毎に `updateAllMatchTimes()` を実行するトリガーの開始/停止をサポートしています（手動で開始/停止する運用を想定）。
+
 ### データ構造の検証パターン
 
 すべてのシート操作は `getSheetStructure()` 経由でヘッダー検証（列追加時は `REQUIRED_HEADERS` を先に更新）:
@@ -202,6 +211,14 @@ const playerId = PLAYER_ID_PREFIX + Utilities.formatString(`%0${ID_DIGITS}d`, pa
 4. **数値の型変換**: `parseInt()` 使用時は必ず基数 `10` を指定。ユーザー入力を扱うときは正規表現チェックも追加。
 5. **パフォーマンス最適化の維持**: `matchPlayers()` は Map/Set キャッシュで最適化済み。過去対戦相手のチェックは関数内で完結しており、外部ヘルパー関数は使用しない。
 6. **Apps Script 制限の考慮**: 1 回の処理でアクセスするシート回数を最小化。ループ内で `getRange`/`setValue` を繰り返さない。
+
+### 実装時の静的解析と注意点（開発者向け補足）
+
+-   一部の変更でエディタや静的解析（型チェック）が "Sheet | null" や JSDoc の型不一致を指摘するケースが増えています。これは `getSheetByName()` の戻り値が `null` になる可能性や、LockService 型が JSDoc で正しく解釈されないためです。
+-   開発時の推奨対応:
+    -   `getSheetStructure()` を呼ぶ前提でシート存在を検証するか、呼び出し側で適切に null チェックを行ってください。現状の実装は「シートが存在する前提」で例外を投げることで早期検出する設計になっています。
+    -   JSDoc の LockService 型や外部 API の型はエディタ設定により警告が出ることがあるため、必要に応じてコメントで型を明示してください（例: `/** @type {LockService.Lock} */`）。
+    -   `formatElapsedMs()` のように表示ロジックは共通化しておくと、Date/タイムゾーンの問題を局所化できます。
 
 ## 外部依存関係
 

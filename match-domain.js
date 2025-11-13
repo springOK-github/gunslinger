@@ -210,7 +210,7 @@ function matchPlayers() {
               p2Id,
               playerNameMap.get(p2Id) || p2Id,
               Utilities.formatDate(new Date(), "Asia/Tokyo", "yyyy/MM/dd HH:mm:ss"),
-              0,
+              ,
             ],
           ]);
       }

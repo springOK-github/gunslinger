@@ -477,7 +477,7 @@ function updateAllMatchTimes() {
       if (startTime.toString() !== "Invalid Date") {
         const elapsedMs = currentTime.getTime() - startTime.getTime();
         const elapsedDate = new Date(elapsedMs);
-        const formattedElapsed = Utilities.formatDate(elapsedDate, "Asia/Tokyo", "mm:ss");
+        const formattedElapsed = Utilities.formatDate(elapsedDate, "UTC", "HH:mm:ss");
         inProgressSheet.getRange(i + 1, indices["経過時間"] + 1).setValue(formattedElapsed);
         updatedCount++;
       }

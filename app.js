@@ -46,6 +46,9 @@ function setupSheets() {
     return;
   }
 
+  // タイムゾーンを東京に設定
+  ss.setSpreadsheetTimeZone("Asia/Tokyo");
+
   // 対戦時間計測トリガーを削除
   deleteMatchTimeUpdaterTrigger(false);
 

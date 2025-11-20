@@ -47,15 +47,7 @@ function registerTestPlayers() {
 
       playerSheet.appendRow([newId, playerName, 0, 0, 0, PLAYER_STATUS.WAITING, formattedTime]);
       Logger.log(`プレイヤー ${playerName} (${newId}) を登録しました。`);
-    }
-
-    // 自動マッチング
-    const waitingPlayersCount = getWaitingPlayers().length;
-    if (waitingPlayersCount >= 2) {
-      Logger.log(`テストプレイヤー登録完了。待機プレイヤーが ${waitingPlayersCount} 人いるため、自動でマッチングを開始します。`);
-      matchPlayers();
-    } else {
-      Logger.log(`テストプレイヤー登録完了。待機プレイヤーが ${waitingPlayersCount} 人です。`);
+      matchPlayers(); // 登録都度マッチングさせる
     }
   } catch (e) {
     Logger.log("registerTestPlayers エラー: " + e.toString());

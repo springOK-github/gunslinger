@@ -14,6 +14,19 @@
  */
 function matchPlayers() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  // メンテナンスモードが有効なら処理を中止する
+  try {
+    const props = PropertiesService.getDocumentProperties();
+    const maintenance = props.getProperty("MAINTENANCE_MODE");
+    if (maintenance === "1") {
+      Logger.log("matchPlayers: MAINTENANCE_MODE のためマッチングをスキップします。");
+      return 0;
+    }
+  } catch (e) {
+    // PropertiesService にアクセスできない場合もマッチングを続行（安全側でログのみ）
+    Logger.log("matchPlayers: PropertiesService チェックでエラー: " + e && e.toString());
+  }
+
   const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
   let lock = null;
 

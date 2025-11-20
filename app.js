@@ -14,7 +14,8 @@
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
   ui.createMenu("🃏 ガンスリンガーマッチング")
-    .addItem("⚙️ シートの初期設定", "setupSheets")
+    .addItem("🏁 大会開始", "startTournament")
+    .addItem("🏁 大会終了", "endTournament")
     .addSeparator()
     .addItem("⏱️ 経過時間更新の開始", "setupMatchTimeUpdaterTrigger")
     .addItem("⏹️ 経過時間更新の停止", "deleteMatchTimeUpdaterTrigger")
@@ -34,15 +35,15 @@ function onOpen() {
 /**
  * スプレッドシートを初期化し、必要なシートとヘッダーを作成します。
  */
-function setupSheets() {
+function startTournament() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
   // 確認メッセージを表示
   const ui = SpreadsheetApp.getUi();
-  const response = ui.alert("シートの初期設定", "シートの初期設定を行いますか？\n\n既存のデータはすべて削除されます。", ui.ButtonSet.YES_NO);
+  const response = ui.alert("大会開始", "大会を開始します。\n\n既存のデータはすべて削除されます。大会を開始してもよろしいですか？", ui.ButtonSet.YES_NO);
 
   if (response !== ui.Button.YES) {
-    ui.alert("シートの初期設定をキャンセルしました。");
+    ui.alert("大会開始をキャンセルしました。");
     return;
   }
 
@@ -94,7 +95,243 @@ function setupSheets() {
     .setBackground("#d9ead3")
     .setHorizontalAlignment("center");
 
-  Logger.log("シートの初期設定が完了しました。");
+  Logger.log("大会を開始します。Ready to go!!");
+}
+
+/**
+ * 大会終了処理: 対戦履歴シートをコピーして日時付きでリネーム（バックアップ）します。
+ * コピー元のデータはそのまま残します（運用で必要ならコピー後にクリアも可能）。
+ */
+function endTournament() {
+  const ui = SpreadsheetApp.getUi();
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  const response = ui.alert("大会終了", "大会を終了して対戦履歴をバックアップします。よろしいですか？", ui.ButtonSet.YES_NO);
+
+  if (response !== ui.Button.YES) {
+    ui.alert("大会終了をキャンセルしました。");
+    return;
+  }
+
+  let lock = null;
+  try {
+    lock = acquireLock("大会終了");
+
+    // メンテナンスモードを有効化して自動マッチングを抑止
+    try {
+      PropertiesService.getDocumentProperties().setProperty("MAINTENANCE_MODE", "1");
+    } catch (e) {
+      Logger.log("MAINTENANCE_MODE の設定に失敗: " + e && e.toString());
+    }
+
+    const historySheet = ss.getSheetByName(SHEET_HISTORY);
+    if (!historySheet) {
+      ui.alert("エラー", `シートが見つかりません: ${SHEET_HISTORY}`, ui.ButtonSet.OK);
+      return;
+    }
+
+    // 進行中の対戦があるか確認し、ユーザーの確認後に別関数で強制終了処理を実行する
+    const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
+    if (inProgressSheet) {
+      const { indices: inIdx, data: inData } = getSheetStructure(inProgressSheet, SHEET_IN_PROGRESS);
+      let activeCount = 0;
+      for (let i = 1; i < inData.length; i++) {
+        const row = inData[i];
+        const id1 = row[inIdx["ID1"]];
+        const id2 = row[inIdx["ID2"]];
+        if (id1 && id2) activeCount++;
+      }
+
+      if (activeCount > 0) {
+        const confirm = ui.alert(
+          "対戦中の卓があります",
+          `現在 ${activeCount} 件の対戦が進行中です。大会終了の前にこれらを強制終了してバックアップしますか？\n\n(はいを選ぶと、進行中の対戦を対戦履歴に『大会終了』として記録し、選手を待機状態に戻します。)`,
+          ui.ButtonSet.YES_NO
+        );
+
+        if (confirm !== ui.Button.YES) {
+          ui.alert("大会終了をキャンセルしました。");
+          return;
+        }
+
+        // 実際の強制終了処理は別関数に切り出し
+        endAllActiveMatches();
+      }
+    }
+
+    // 日時を取得（スプレッドシートのタイムゾーンを使用）
+    const tz = ss.getSpreadsheetTimeZone() || "Asia/Tokyo";
+    const timestamp = Utilities.formatDate(new Date(), tz, "yyyyMMdd_HHmmss");
+    const baseName = `${SHEET_HISTORY}_${timestamp}`;
+
+    // コピーを作成してリネーム
+    const copied = historySheet.copyTo(ss);
+
+    // setName が衝突すると例外になるため、一意の名前を作る
+    let newName = baseName;
+    let suffix = 1;
+    while (ss.getSheetByName(newName)) {
+      newName = `${baseName}_${suffix}`;
+      suffix++;
+    }
+
+    copied.setName(newName);
+    // コピーを末尾に移動すると見やすくなる
+    ss.setActiveSheet(copied);
+    ss.moveActiveSheet(ss.getNumSheets());
+
+    Logger.log(`大会終了: 対戦履歴をバックアップしました -> ${newName}`);
+  } catch (e) {
+    ui.alert("エラー", `大会終了に失敗しました: ${e.message}`, ui.ButtonSet.OK);
+    Logger.log("endTournament エラー: " + e.toString());
+  } finally {
+    // メンテナンスモードを解除
+    try {
+      PropertiesService.getDocumentProperties().deleteProperty("MAINTENANCE_MODE");
+    } catch (e) {
+      Logger.log("MAINTENANCE_MODE の解除に失敗: " + e && e.toString());
+    }
+
+    releaseLock(lock);
+  }
+}
+
+/**
+ * 進行中の全対戦を強制終了して対戦履歴に追記し、プレイヤーを待機状態に戻す処理。
+ * この関数はロックを保持した状態で呼び出すことを想定しています（呼び出し元で acquireLock を行ってください）。
+ * @returns {number} 終了させた対戦の件数
+ */
+function endAllActiveMatches() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const props = PropertiesService.getDocumentProperties();
+  let ownedMaintenanceFlag = false;
+
+  // もし MAINTENANCE_MODE が未設定ならここで設定して、終了時に解除する
+  try {
+    const current = props.getProperty("MAINTENANCE_MODE");
+    if (current !== "1") {
+      props.setProperty("MAINTENANCE_MODE", "1");
+      ownedMaintenanceFlag = true;
+    }
+  } catch (e) {
+    Logger.log("endAllActiveMatches: MAINTENANCE_MODE 操作に失敗: " + (e && e.toString()));
+  }
+
+  const historySheet = ss.getSheetByName(SHEET_HISTORY);
+  const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
+
+  if (!historySheet || !inProgressSheet) return 0;
+
+  const { indices: inIdx, data: inData } = getSheetStructure(inProgressSheet, SHEET_IN_PROGRESS);
+  const { indices: histIdx, data: histData } = getSheetStructure(historySheet, SHEET_HISTORY);
+
+  // 活動中の対戦行を収集
+  const activeRows = [];
+  for (let i = 1; i < inData.length; i++) {
+    const row = inData[i];
+    const id1 = row[inIdx["ID1"]];
+    const id2 = row[inIdx["ID2"]];
+    if (id1 && id2) activeRows.push({ rowIndex: i + 1, row });
+  }
+
+  if (activeRows.length === 0) return 0;
+
+  // 対戦ID の最大を計算
+  let maxNum = 0;
+  for (let i = 1; i < histData.length; i++) {
+    const vid = histData[i][histIdx["対戦ID"]];
+    if (typeof vid === "string" && vid.startsWith("T")) {
+      const num = parseInt(vid.substring(1), 10);
+      if (!isNaN(num) && num > maxNum) maxNum = num;
+    }
+  }
+
+  const tz = ss.getSpreadsheetTimeZone() || "Asia/Tokyo";
+  const now = new Date();
+  const endTimeStr = Utilities.formatDate(now, tz, "yyyy/MM/dd HH:mm:ss");
+
+  const rowsToAppend = [];
+  for (const item of activeRows) {
+    const r = item.row;
+    const tableNumber = r[inIdx["卓番号"]] || "";
+    const id1 = r[inIdx["ID1"]] || "";
+    const name1 = r[inIdx["プレイヤー1"]] || id1;
+    const id2 = r[inIdx["ID2"]] || "";
+    const name2 = r[inIdx["プレイヤー2"]] || id2;
+
+    maxNum++;
+    const matchId = "T" + Utilities.formatString("%04d", maxNum);
+    const winnerName = "大会終了";
+    const matchTime = "";
+
+    const newRow = [];
+    newRow[histIdx["対戦ID"]] = matchId;
+    newRow[histIdx["卓番号"]] = tableNumber;
+    newRow[histIdx["ID1"]] = id1;
+    newRow[histIdx["プレイヤー1"]] = name1;
+    newRow[histIdx["ID2"]] = id2;
+    newRow[histIdx["プレイヤー2"]] = name2;
+    newRow[histIdx["勝者名"]] = winnerName;
+    newRow[histIdx["対戦終了時刻"]] = endTimeStr;
+    newRow[histIdx["対戦時間"]] = matchTime;
+
+    rowsToAppend.push(newRow);
+
+    // プレイヤー状態を待機に戻す
+    try {
+      updatePlayerState({
+        targetPlayerId: id1,
+        newStatus: PLAYER_STATUS.WAITING,
+        opponentNewStatus: PLAYER_STATUS.WAITING,
+        recordResult: false,
+        isTargetWinner: false,
+      });
+    } catch (e) {
+      Logger.log("updatePlayerState error for %s: %s", id1, e && e.toString());
+    }
+    try {
+      updatePlayerState({
+        targetPlayerId: id2,
+        newStatus: PLAYER_STATUS.WAITING,
+        opponentNewStatus: PLAYER_STATUS.WAITING,
+        recordResult: false,
+        isTargetWinner: false,
+      });
+    } catch (e) {
+      Logger.log("updatePlayerState error for %s: %s", id2, e && e.toString());
+    }
+  }
+
+  // 追記
+  const appendStartRow = historySheet.getLastRow() + 1;
+  for (let i = 0; i < rowsToAppend.length; i++) {
+    const rowVals = [];
+    const headers = REQUIRED_HEADERS[SHEET_HISTORY];
+    for (let j = 0; j < headers.length; j++) {
+      rowVals.push(rowsToAppend[i][j] || "");
+    }
+    historySheet.getRange(appendStartRow + i, 1, 1, rowVals.length).setValues([rowVals]);
+  }
+
+  // 進行中シートの該当行はクリアする
+  for (const item of activeRows) {
+    const rIdx = item.rowIndex;
+    const clearCols = [inIdx["ID1"], inIdx["プレイヤー1"], inIdx["ID2"], inIdx["プレイヤー2"], inIdx["対戦開始時刻"], inIdx["経過時間"]];
+    for (const c of clearCols) {
+      inProgressSheet.getRange(rIdx, c + 1).setValue("");
+    }
+  }
+
+  // MAINTENANCE_MODE をこの関数で立てた場合は解除する
+  try {
+    if (ownedMaintenanceFlag) {
+      props.deleteProperty("MAINTENANCE_MODE");
+    }
+  } catch (e) {
+    Logger.log("endAllActiveMatches: MAINTENANCE_MODE の解除に失敗: " + (e && e.toString()));
+  }
+
+  return activeRows.length;
 }
 
 // =========================================

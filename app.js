@@ -117,6 +117,13 @@ function endTournament() {
   try {
     lock = acquireLock("大会終了");
 
+    // メンテナンスモードを有効化して自動マッチングを抑止
+    try {
+      PropertiesService.getDocumentProperties().setProperty("MAINTENANCE_MODE", "1");
+    } catch (e) {
+      Logger.log("MAINTENANCE_MODE の設定に失敗: " + e && e.toString());
+    }
+
     const historySheet = ss.getSheetByName(SHEET_HISTORY);
     if (!historySheet) {
       ui.alert("エラー", `シートが見つかりません: ${SHEET_HISTORY}`, ui.ButtonSet.OK);
@@ -178,6 +185,13 @@ function endTournament() {
     ui.alert("エラー", `大会終了に失敗しました: ${e.message}`, ui.ButtonSet.OK);
     Logger.log("endTournament エラー: " + e.toString());
   } finally {
+    // メンテナンスモードを解除
+    try {
+      PropertiesService.getDocumentProperties().deleteProperty("MAINTENANCE_MODE");
+    } catch (e) {
+      Logger.log("MAINTENANCE_MODE の解除に失敗: " + e && e.toString());
+    }
+
     releaseLock(lock);
   }
 }
@@ -189,6 +203,20 @@ function endTournament() {
  */
 function endAllActiveMatches() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const props = PropertiesService.getDocumentProperties();
+  let ownedMaintenanceFlag = false;
+
+  // もし MAINTENANCE_MODE が未設定ならここで設定して、終了時に解除する
+  try {
+    const current = props.getProperty("MAINTENANCE_MODE");
+    if (current !== "1") {
+      props.setProperty("MAINTENANCE_MODE", "1");
+      ownedMaintenanceFlag = true;
+    }
+  } catch (e) {
+    Logger.log("endAllActiveMatches: MAINTENANCE_MODE 操作に失敗: " + (e && e.toString()));
+  }
+
   const historySheet = ss.getSheetByName(SHEET_HISTORY);
   const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
 
@@ -292,6 +320,15 @@ function endAllActiveMatches() {
     for (const c of clearCols) {
       inProgressSheet.getRange(rIdx, c + 1).setValue("");
     }
+  }
+
+  // MAINTENANCE_MODE をこの関数で立てた場合は解除する
+  try {
+    if (ownedMaintenanceFlag) {
+      props.deleteProperty("MAINTENANCE_MODE");
+    }
+  } catch (e) {
+    Logger.log("endAllActiveMatches: MAINTENANCE_MODE の解除に失敗: " + (e && e.toString()));
   }
 
   return activeRows.length;

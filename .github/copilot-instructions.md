@@ -130,6 +130,12 @@ try {
 -   `updateAllMatchTimes()` — マッチングシート上の対戦開始時刻からミリ秒差を算出し、`formatElapsedMs()` を使って `経過時間` 列を HH:mm:ss 表示で更新します。従来の Date を経由したフォーマットで時刻ズレが出ていたため、ミリ秒 → 文字列のヘルパーを導入しました。
 -   メニュー/トリガー関係: `setupMatchTimeUpdaterTrigger()` と `deleteMatchTimeUpdaterTrigger()` を `app.js` に追加し、1 分毎に `updateAllMatchTimes()` を実行するトリガーの開始/停止をサポートしています（手動で開始/停止する運用を想定）。
 
+### 大会開始 / 終了と運用フラグ
+
+-   `app.js` に `startTournament()`（以前の setupSheets 相当）と `endTournament()` を追加しました。`startTournament()` はシート初期化とタイムゾーン設定を行い、`endTournament()` は対戦履歴の日時付きバックアップを作成します。
+-   `endTournament()` 実行時は進行中の対戦があれば `endAllActiveMatches()` を呼んで強制終了し、履歴へ「大会終了」として追記します。
+-   保守／強制終了中に自動マッチングが走らないよう、`MAINTENANCE_MODE` フラグを PropertiesService に保存しておき、`matchPlayers()` の先頭でチェックしてスキップする仕組みを導入しました。
+
 ### データ構造の検証パターン
 
 すべてのシート操作は `getSheetStructure()` 経由でヘッダー検証（列追加時は `REQUIRED_HEADERS` を先に更新）:

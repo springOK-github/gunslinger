@@ -49,8 +49,8 @@ function setupSheets() {
   // タイムゾーンを東京に設定
   ss.setSpreadsheetTimeZone("Asia/Tokyo");
 
-  // 対戦時間計測トリガーを削除
-  deleteMatchTimeUpdaterTrigger(false);
+  // 対戦時間計測トリガーを追加
+  setupMatchTimeUpdaterTrigger(false);
 
   // 1. プレイヤーシート
   let playerSheet = ss.getSheetByName(SHEET_PLAYERS);
@@ -195,14 +195,16 @@ function configureMaxTables() {
  * updateAllMatchTimesを1分周期でGASトリガーと仕掛けます。
  */
 
-function setupMatchTimeUpdaterTrigger() {
+function setupMatchTimeUpdaterTrigger(showAlert = true) {
   // 確認するダイアログを表示
-  const ui = SpreadsheetApp.getUi();
-  const response = ui.alert("対戦時間計測タイマーの開始", "対戦時間計測タイマーを開始しますか？", ui.ButtonSet.YES_NO);
+  if (showAlert) {
+    const ui = SpreadsheetApp.getUi();
+    const response = ui.alert("対戦時間計測タイマーの開始", "対戦時間計測タイマーを開始しますか？", ui.ButtonSet.YES_NO);
 
-  if (response !== ui.Button.YES) {
-    ui.alert("タイマーの開始をキャンセルしました。");
-    return;
+    if (response !== ui.Button.YES) {
+      ui.alert("タイマーの開始をキャンセルしました。");
+      return;
+    }
   }
 
   // 既存のトリガーを削除

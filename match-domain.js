@@ -9,21 +9,222 @@
 // =========================================
 
 /**
+ * プレイヤーID→名前のマップを構築します
+ * @param {Array[]} playerData プレイヤーシートのデータ
+ * @param {Object} playerIndices 列インデックス
+ * @returns {Map<string, string>} プレイヤーID→名前のMap
+ */
+function buildPlayerNameMap(playerData, playerIndices) {
+  const playerNameMap = new Map();
+  for (let i = 1; i < playerData.length; i++) {
+    const row = playerData[i];
+    const playerId = row[playerIndices["プレイヤーID"]];
+    const playerName = row[playerIndices["プレイヤー名"]];
+    if (!playerId) continue;
+    playerNameMap.set(playerId, playerName);
+  }
+  return playerNameMap;
+}
+
+/**
+ * 過去の対戦相手マップを構築します（再戦回避用）
+ * @param {Array[]} historyData 対戦履歴シートのデータ
+ * @param {Object} historyIndices 列インデックス
+ * @returns {Map<string, Set<string>>} プレイヤーID→対戦相手IDのSetのMap
+ */
+function buildOpponentsMap(historyData, historyIndices) {
+  const opponentsMap = new Map();
+  const p1Col = historyIndices["ID1"];
+  const p2Col = historyIndices["ID2"];
+
+  for (let i = 1; i < historyData.length; i++) {
+    const row = historyData[i];
+    const p1 = row[p1Col];
+    const p2 = row[p2Col];
+
+    if (!p1 || !p2) continue;
+
+    if (!opponentsMap.has(p1)) opponentsMap.set(p1, new Set());
+    if (!opponentsMap.has(p2)) opponentsMap.set(p2, new Set());
+
+    opponentsMap.get(p1).add(p2);
+    opponentsMap.get(p2).add(p1);
+  }
+  return opponentsMap;
+}
+
+/**
+ * 待機中プレイヤーを抽出してソートします
+ * @param {Array[]} playerData プレイヤーシートのデータ
+ * @param {Object} playerIndices 列インデックス
+ * @returns {Array[]} ソート済み待機プレイヤーの配列
+ */
+function getAndSortWaitingPlayers(playerData, playerIndices) {
+  return playerData
+    .slice(1)
+    .filter((row) => row[playerIndices["参加状況"]] === PLAYER_STATUS.WAITING)
+    .sort((a, b) => {
+      const winsDiff = b[playerIndices["勝数"]] - a[playerIndices["勝数"]];
+      if (winsDiff !== 0) return winsDiff;
+
+      const dateA = a[playerIndices["最終対戦時刻"]] instanceof Date ? a[playerIndices["最終対戦時刻"]].getTime() : 0;
+      const dateB = b[playerIndices["最終対戦時刻"]] instanceof Date ? b[playerIndices["最終対戦時刻"]].getTime() : 0;
+      return dateA - dateB;
+    });
+}
+
+/**
+ * 再戦回避を考慮してマッチングペアを決定します
+ * @param {Array[]} waitingPlayers 待機プレイヤーの配列
+ * @param {Object} playerIndices 列インデックス
+ * @param {Map<string, Set<string>>} opponentsMap 過去対戦相手マップ
+ * @returns {{matches: Array, skippedPlayers: Array}} マッチング結果
+ */
+function findMatchPairs(waitingPlayers, playerIndices, opponentsMap) {
+  const matches = [];
+  const availablePlayers = [...waitingPlayers];
+  const skippedPlayers = [];
+
+  while (availablePlayers.length >= 2) {
+    const p1 = availablePlayers.splice(0, 1)[0];
+    if (!p1) break;
+
+    const p1Id = p1[playerIndices["プレイヤーID"]];
+    const p1Opponents = opponentsMap.get(p1Id) || new Set();
+
+    let p2Index = -1;
+    for (let i = 0; i < availablePlayers.length; i++) {
+      const p2Id = availablePlayers[i][playerIndices["プレイヤーID"]];
+      if (!p1Opponents.has(p2Id)) {
+        p2Index = i;
+        break;
+      }
+    }
+
+    if (p2Index !== -1) {
+      const p2 = availablePlayers.splice(p2Index, 1)[0];
+      const matchPair = [p1Id, p2[playerIndices["プレイヤーID"]]];
+      matches.push(matchPair);
+      Logger.log(`マッチング成立 (再戦なし): ${p1Id} vs ${p2[playerIndices["プレイヤーID"]]}`);
+    } else {
+      skippedPlayers.push(p1);
+    }
+  }
+
+  skippedPlayers.push(...availablePlayers);
+  return { matches, skippedPlayers };
+}
+
+/**
+ * マッチングシートから卓の使用状況を取得します
+ * @param {Array[]} matchData マッチングシートのデータ
+ * @param {Object} matchIndices 列インデックス
+ * @returns {{availableTables: Array, usedTables: Set<number>}} 卓の状態
+ */
+function getTableStatus(matchData, matchIndices) {
+  const availableTables = [];
+  const usedTables = new Set();
+
+  for (let i = 1; i < matchData.length; i++) {
+    const row = matchData[i];
+    const tableNumber = row[matchIndices["卓番号"]];
+    if (!tableNumber) continue;
+
+    if (!row[matchIndices["ID1"]]) {
+      availableTables.push({ row: i, tableNumber: tableNumber });
+    } else {
+      usedTables.add(tableNumber);
+    }
+  }
+
+  return { availableTables, usedTables };
+}
+
+/**
+ * マッチング結果をシートに書き込みます
+ * @param {Object} params 書き込みパラメータ
+ */
+function writeMatchResults(params) {
+  const { actualMatches, playerSheet, playerData, playerIndices, inProgressSheet, matchData, playerNameMap, availableTables, usedTables } = params;
+
+  const playerIdsToUpdate = new Set(actualMatches.flat());
+
+  // プレイヤー状態を更新
+  for (let i = 1; i < playerData.length; i++) {
+    const row = playerData[i];
+    const playerId = row[playerIndices["プレイヤーID"]];
+    if (playerIdsToUpdate.has(playerId)) {
+      playerSheet.getRange(i + 1, playerIndices["参加状況"] + 1).setValue(PLAYER_STATUS.IN_PROGRESS);
+    }
+  }
+
+  let nextNewRow = matchData.length;
+
+  for (const match of actualMatches) {
+    const [p1Id, p2Id] = match;
+    let targetRow = null;
+    let tableNumber = null;
+
+    // 勝者の前回使用した卓を確認
+    const lastTable = getLastTableNumber(p1Id);
+    if (lastTable) {
+      const validation = validateTableNumber(lastTable);
+      if (validation.isValid && !usedTables.has(lastTable)) {
+        const availableTableIndex = availableTables.findIndex((t) => t.tableNumber === lastTable);
+        if (availableTableIndex !== -1) {
+          const table = availableTables.splice(availableTableIndex, 1)[0];
+          targetRow = table.row;
+          tableNumber = table.tableNumber;
+          usedTables.add(tableNumber);
+        }
+      }
+    }
+
+    if (targetRow === null) {
+      if (availableTables.length > 0) {
+        const table = availableTables.shift();
+        targetRow = table?.row;
+        tableNumber = table?.tableNumber;
+      } else {
+        const newTableNumber = getNextAvailableTableNumber(inProgressSheet);
+        tableNumber = newTableNumber;
+        targetRow = nextNewRow;
+        nextNewRow++;
+        inProgressSheet.getRange(targetRow + 1, 1).setValue(newTableNumber);
+      }
+      usedTables.add(tableNumber);
+    }
+
+    inProgressSheet
+      .getRange(targetRow + 1, 2, 1, 6)
+      .setValues([
+        [
+          p1Id,
+          playerNameMap.get(p1Id) || p1Id,
+          p2Id,
+          playerNameMap.get(p2Id) || p2Id,
+          Utilities.formatDate(new Date(), "Asia/Tokyo", "yyyy/MM/dd HH:mm:ss"),
+          ,
+        ],
+      ]);
+  }
+}
+
+/**
  * 待機中のプレイヤーを抽出し、再戦履歴を厳格に考慮してマッチングを行います。
  * 過去に対戦した相手しかいない場合、マッチングを成立させずに待機させます。
  */
 function matchPlayers() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  // メンテナンスモードが有効なら処理を中止する
+
+  // メンテナンスモードチェック
   try {
     const props = PropertiesService.getDocumentProperties();
-    const maintenance = props.getProperty("MAINTENANCE_MODE");
-    if (maintenance === "1") {
+    if (props.getProperty("MAINTENANCE_MODE") === "1") {
       Logger.log("matchPlayers: MAINTENANCE_MODE のためマッチングをスキップします。");
       return 0;
     }
   } catch (e) {
-    // PropertiesService にアクセスできない場合もマッチングを続行（安全側でログのみ）
     Logger.log("matchPlayers: PropertiesService チェックでエラー: " + e?.toString());
   }
 
@@ -32,6 +233,7 @@ function matchPlayers() {
   try {
     lock = acquireLock("マッチング実行");
 
+    // シート取得
     const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
     const historySheet = ss.getSheetByName(SHEET_HISTORY);
     const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
@@ -40,204 +242,72 @@ function matchPlayers() {
       return 0;
     }
 
+    // データ取得
     const { indices: playerIndices, data: playerData } = getSheetStructure(playerSheet, SHEET_PLAYERS);
     const { indices: historyIndices, data: historyData } = getSheetStructure(historySheet, SHEET_HISTORY);
     const { indices: matchIndices, data: matchData } = getSheetStructure(inProgressSheet, SHEET_IN_PROGRESS);
 
-    const playerNameMap = new Map();
-    for (let i = 1; i < playerData.length; i++) {
-      const row = playerData[i];
-      const playerId = row[playerIndices["プレイヤーID"]];
-      const playerName = row[playerIndices["プレイヤー名"]];
-      if (!playerId) continue;
-      playerNameMap.set(playerId, playerName);
-    }
+    // マップ構築
+    const playerNameMap = buildPlayerNameMap(playerData, playerIndices);
+    const opponentsMap = buildOpponentsMap(historyData, historyIndices);
 
-    const opponentsMap = new Map();
-    const p1Col = historyIndices["ID1"];
-    const p2Col = historyIndices["ID2"];
-
-    for (let i = 1; i < historyData.length; i++) {
-      const row = historyData[i];
-      const p1 = row[p1Col];
-      const p2 = row[p2Col];
-
-      // 空または null の ID をスキップ
-      if (!p1 || !p2) continue;
-
-      if (!opponentsMap.has(p1)) opponentsMap.set(p1, new Set());
-      if (!opponentsMap.has(p2)) opponentsMap.set(p2, new Set());
-
-      opponentsMap.get(p1).add(p2);
-      opponentsMap.get(p2).add(p1);
-    }
-
-    // 待機プレイヤーを取得（playerDataから直接抽出してソート）
-    const waitingPlayers = playerData
-      .slice(1) // ヘッダー行を除外
-      .filter((row) => row[playerIndices["参加状況"]] === PLAYER_STATUS.WAITING)
-      .sort((a, b) => {
-        // 勝数が多い順（降順）
-        const winsDiff = b[playerIndices["勝数"]] - a[playerIndices["勝数"]];
-        if (winsDiff !== 0) return winsDiff;
-
-        // 勝数が同じ場合は、登録/最終対戦が古い順（昇順 = 先着順）
-        const dateA = a[playerIndices["最終対戦時刻"]] instanceof Date ? a[playerIndices["最終対戦時刻"]].getTime() : 0;
-        const dateB = b[playerIndices["最終対戦時刻"]] instanceof Date ? b[playerIndices["最終対戦時刻"]].getTime() : 0;
-        return dateA - dateB;
-      });
-
+    // 待機プレイヤー取得
+    const waitingPlayers = getAndSortWaitingPlayers(playerData, playerIndices);
     if (waitingPlayers.length < 2) {
       Logger.log(`警告: 現在待機中のプレイヤーは ${waitingPlayers.length} 人です。2人以上必要です。`);
-      return;
+      return 0;
     }
 
-    let matches = [];
-    let availablePlayers = [...waitingPlayers];
-    let skippedPlayers = [];
-
+    // マッチングペア決定
     Logger.log("--- 厳格な再戦回避マッチング開始 (勝者優先) ---");
-
-    while (availablePlayers.length >= 2) {
-      const p1 = availablePlayers.shift();
-      const p1Id = p1[playerIndices["プレイヤーID"]];
-      const p1Opponents = opponentsMap.get(p1Id) || new Set();
-
-      let p2Index = -1;
-      for (let i = 0; i < availablePlayers.length; i++) {
-        const p2Id = availablePlayers[i][playerIndices["プレイヤーID"]];
-        if (!p1Opponents.has(p2Id)) {
-          p2Index = i;
-          break;
-        }
-      }
-
-      if (p2Index !== -1) {
-        const p2 = availablePlayers.splice(p2Index, 1)[0];
-        matches.push([p1Id, p2[playerIndices["プレイヤーID"]]]);
-        Logger.log(`マッチング成立 (再戦なし): ${p1Id} vs ${p2[playerIndices["プレイヤーID"]]}`);
-      } else {
-        skippedPlayers.push(p1);
-      }
-    }
-
-    skippedPlayers.push(...availablePlayers);
+    const { matches, skippedPlayers } = findMatchPairs(waitingPlayers, playerIndices, opponentsMap);
 
     if (skippedPlayers.length > 0) {
       Logger.log(`警告: ${skippedPlayers.length} 人のプレイヤーは適切な相手が見つからなかったため、待機を継続します。`);
     }
 
-    // マッチング結果の反映
-    if (matches.length > 0) {
-      // 既存の卓の状態を確認
-      const availableTables = [];
-      const usedTables = new Set();
-
-      for (let i = 1; i < matchData.length; i++) {
-        const row = matchData[i];
-        const tableNumber = row[matchIndices["卓番号"]];
-        if (!tableNumber) continue;
-
-        if (!row[matchIndices["ID1"]]) {
-          availableTables.push({ row: i, tableNumber: tableNumber });
-        } else {
-          usedTables.add(tableNumber);
-        }
-      }
-
-      // 利用可能な卓数を計算
-      const maxTables = getMaxTables();
-      const totalExistingTables = availableTables.length + usedTables.size;
-      const maxNewTables = Math.max(0, maxTables - totalExistingTables);
-      const totalAvailableSlots = availableTables.length + maxNewTables;
-
-      Logger.log(
-        `[デバッグ] 卓数情報: 最大=${maxTables}, 空き=${availableTables.length}, 使用中=${usedTables.size}, 既存合計=${totalExistingTables}, 新規作成可能=${maxNewTables}, 利用可能スロット=${totalAvailableSlots}`
-      );
-      Logger.log(`[デバッグ] マッチング候補数: ${matches.length}組`);
-
-      // 卓数制限を考慮
-      const actualMatches = matches.slice(0, totalAvailableSlots);
-      const skippedMatches = matches.slice(totalAvailableSlots);
-
-      if (skippedMatches.length > 0) {
-        Logger.log(`警告: 卓数上限により ${skippedMatches.length} 組のマッチングを見送りました。`);
-        for (const match of skippedMatches) {
-          const [p1Id, p2Id] = match;
-          Logger.log(`見送り: ${p1Id} vs ${p2Id}`);
-        }
-      }
-
-      const playerIdsToUpdate = new Set(actualMatches.flat());
-
-      // 更新対象を収集
-      for (let i = 1; i < playerData.length; i++) {
-        const row = playerData[i];
-        const playerId = row[playerIndices["プレイヤーID"]];
-        if (playerIdsToUpdate.has(playerId)) {
-          // 個別にsetValueを呼ぶ（GASの制約により一括更新が難しい）
-          playerSheet.getRange(i + 1, playerIndices["参加状況"] + 1).setValue(PLAYER_STATUS.IN_PROGRESS);
-        }
-      }
-
-      let nextNewRow = matchData.length;
-
-      for (const match of actualMatches) {
-        const [p1Id, p2Id] = match;
-        let targetRow = null;
-        let tableNumber = null;
-
-        // 勝者の前回使用した卓を確認
-        const lastTable = getLastTableNumber(p1Id);
-        if (lastTable) {
-          const validation = validateTableNumber(lastTable);
-          if (validation.isValid && !usedTables.has(lastTable)) {
-            const availableTableIndex = availableTables.findIndex((t) => t.tableNumber === lastTable);
-            if (availableTableIndex !== -1) {
-              const table = availableTables.splice(availableTableIndex, 1)[0];
-              targetRow = table.row;
-              tableNumber = table.tableNumber;
-              usedTables.add(tableNumber);
-            }
-          }
-        }
-
-        if (targetRow === null) {
-          if (availableTables.length > 0) {
-            const table = availableTables.shift();
-            targetRow = table?.row;
-            tableNumber = table?.tableNumber;
-          } else {
-            const newTableNumber = getNextAvailableTableNumber(inProgressSheet);
-            tableNumber = newTableNumber;
-            targetRow = nextNewRow;
-            nextNewRow++;
-            // 新規卓番号を設定
-            inProgressSheet.getRange(targetRow + 1, 1).setValue(newTableNumber);
-          }
-          usedTables.add(tableNumber);
-        }
-
-        inProgressSheet
-          .getRange(targetRow + 1, 2, 1, 6)
-          .setValues([
-            [
-              p1Id,
-              playerNameMap.get(p1Id) || p1Id,
-              p2Id,
-              playerNameMap.get(p2Id) || p2Id,
-              Utilities.formatDate(new Date(), "Asia/Tokyo", "yyyy/MM/dd HH:mm:ss"),
-              ,
-            ],
-          ]);
-      }
-
-      Logger.log(`マッチングが ${actualMatches.length} 件成立しました。「${SHEET_IN_PROGRESS}」シートを確認してください。`);
-      return actualMatches.length;
-    } else {
+    if (matches.length === 0) {
       Logger.log("警告: 新しいマッチングは成立しませんでした。");
       return 0;
     }
+
+    // 卓の状態を取得
+    const { availableTables, usedTables } = getTableStatus(matchData, matchIndices);
+
+    // 卓数制限の計算
+    const maxTables = getMaxTables();
+    const totalExistingTables = availableTables.length + usedTables.size;
+    const maxNewTables = Math.max(0, maxTables - totalExistingTables);
+    const totalAvailableSlots = availableTables.length + maxNewTables;
+
+    Logger.log(
+      `[デバッグ] 卓数情報: 最大=${maxTables}, 空き=${availableTables.length}, 使用中=${usedTables.size}, 新規作成可能=${maxNewTables}, 利用可能スロット=${totalAvailableSlots}`
+    );
+
+    // 卓数制限を適用
+    const actualMatches = matches.slice(0, totalAvailableSlots);
+    const skippedMatches = matches.slice(totalAvailableSlots);
+
+    if (skippedMatches.length > 0) {
+      Logger.log(`警告: 卓数上限により ${skippedMatches.length} 組のマッチングを見送りました。`);
+      skippedMatches.forEach(([p1Id, p2Id]) => Logger.log(`見送り: ${p1Id} vs ${p2Id}`));
+    }
+
+    // シートに書き込み
+    writeMatchResults({
+      actualMatches,
+      playerSheet,
+      playerData,
+      playerIndices,
+      inProgressSheet,
+      matchData,
+      playerNameMap,
+      availableTables,
+      usedTables,
+    });
+
+    Logger.log(`マッチングが ${actualMatches.length} 件成立しました。「${SHEET_IN_PROGRESS}」シートを確認してください。`);
+    return actualMatches.length;
   } catch (e) {
     Logger.log("matchPlayers エラー: " + e.message);
     return 0;

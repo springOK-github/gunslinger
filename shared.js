@@ -58,6 +58,10 @@ function getSheetStructure(sheet, sheetName) {
 function getPlayerName(playerId) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
+  if (!playerSheet) {
+    Logger.log("エラー: プレイヤーシートが見つかりません。");
+    return playerId;
+  }
   const { indices, data } = getSheetStructure(playerSheet, SHEET_PLAYERS);
 
   for (let i = 1; i < data.length; i++) {
@@ -153,6 +157,10 @@ function getNextAvailableTableNumber(inProgressSheet) {
 function getLastTableNumber(playerId) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const historySheet = ss.getSheetByName(SHEET_HISTORY);
+  if (!historySheet) {
+    Logger.log("エラー: 履歴シートが見つかりません。");
+    return null;
+  }
   const { indices: historyIndices, data: historyData } = getSheetStructure(historySheet, SHEET_HISTORY);
 
   // 最新の対戦履歴を探す
@@ -235,6 +243,7 @@ function changePlayerStatus(config) {
     newStatus: config.newStatus,
     opponentNewStatus: PLAYER_STATUS.WAITING,
     recordResult: false,
+    isTargetWinner: false,
   });
 
   if (!result.success) {

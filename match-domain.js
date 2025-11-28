@@ -24,10 +24,9 @@ function matchPlayers() {
     }
   } catch (e) {
     // PropertiesService にアクセスできない場合もマッチングを続行（安全側でログのみ）
-    Logger.log("matchPlayers: PropertiesService チェックでエラー: " + e && e.toString());
+    Logger.log("matchPlayers: PropertiesService チェックでエラー: " + e?.toString());
   }
 
-  const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
   let lock = null;
 
   try {
@@ -35,6 +34,11 @@ function matchPlayers() {
 
     const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
     const historySheet = ss.getSheetByName(SHEET_HISTORY);
+    const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
+    if (!playerSheet || !historySheet || !inProgressSheet) {
+      Logger.log("エラー: 必要なシートが見つかりません。");
+      return 0;
+    }
 
     const { indices: playerIndices, data: playerData } = getSheetStructure(playerSheet, SHEET_PLAYERS);
     const { indices: historyIndices, data: historyData } = getSheetStructure(historySheet, SHEET_HISTORY);
@@ -201,8 +205,8 @@ function matchPlayers() {
         if (targetRow === null) {
           if (availableTables.length > 0) {
             const table = availableTables.shift();
-            targetRow = table.row;
-            tableNumber = table.tableNumber;
+            targetRow = table?.row;
+            tableNumber = table?.tableNumber;
           } else {
             const newTableNumber = getNextAvailableTableNumber(inProgressSheet);
             tableNumber = newTableNumber;
@@ -272,6 +276,10 @@ function promptAndRecordResult() {
   // この時点でロックは取得しない
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
+  if (!inProgressSheet) {
+    ui.alert("エラー: 対戦中シートが見つかりません。");
+    return;
+  }
   const { indices, data } = getSheetStructure(inProgressSheet, SHEET_IN_PROGRESS);
   let loserId = null;
 
@@ -381,6 +389,10 @@ function correctMatchResult() {
 
     // 2. 対戦履歴から該当の対戦を検索
     const historySheet = ss.getSheetByName(SHEET_HISTORY);
+    if (!historySheet) {
+      ui.alert("エラー", `シート「${SHEET_HISTORY}」が見つかりません。`, ui.ButtonSet.OK);
+      return;
+    }
     const { indices: historyIndices, data: historyData } = getSheetStructure(historySheet, SHEET_HISTORY);
 
     let matchRow = -1;
@@ -434,6 +446,10 @@ function correctMatchResult() {
 
     // 6. プレイヤーの統計を修正
     const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
+    if (!playerSheet) {
+      ui.alert("エラー", `シート「${SHEET_PLAYERS}」が見つかりません。`, ui.ButtonSet.OK);
+      return;
+    }
     const { indices: playerIndices, data: playerData } = getSheetStructure(playerSheet, SHEET_PLAYERS);
 
     for (let i = 1; i < playerData.length; i++) {
@@ -474,14 +490,18 @@ function correctMatchResult() {
  */
 function updateAllMatchTimes() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
-  const { indices, data } = getSheetStructure(inProgressSheet, SHEET_IN_PROGRESS);
 
   let updatedCount = 0;
   const currentTime = new Date();
   let matchLock = null;
 
   try {
+    const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
+    if (!inProgressSheet) {
+      Logger.log(`エラー: シート「${SHEET_IN_PROGRESS}」が見つかりません。`);
+      return;
+    }
+    const { indices, data } = getSheetStructure(inProgressSheet, SHEET_IN_PROGRESS);
     matchLock = acquireLock("対戦結果の記録");
     for (let i = 1; i < data.length; i++) {
       const row = data[i];

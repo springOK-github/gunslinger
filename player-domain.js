@@ -14,11 +14,15 @@
  */
 function registerPlayer() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
   const ui = SpreadsheetApp.getUi();
   let lock = null;
 
   try {
+    const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
+    if (!playerSheet) {
+      ui.alert("エラー: プレイヤーシートが見つかりません。");
+      return;
+    }
     lock = acquireLock("プレイヤー登録");
     getSheetStructure(playerSheet, SHEET_PLAYERS);
 
@@ -119,10 +123,14 @@ function returnPlayerFromResting() {
 
   // プレイヤーの現在の状態を確認
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
   let lock = null;
 
   try {
+    const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
+    if (!playerSheet) {
+      ui.alert("エラー: プレイヤーシートが見つかりません。");
+      return;
+    }
     lock = acquireLock("休憩からの復帰");
     const { indices, data } = getSheetStructure(playerSheet, SHEET_PLAYERS);
 
@@ -191,9 +199,13 @@ function returnPlayerFromResting() {
  */
 function getWaitingPlayers() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
 
   try {
+    const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
+    if (!playerSheet) {
+      Logger.log("エラー: プレイヤーシートが見つかりません。");
+      return [];
+    }
     const { indices, data } = getSheetStructure(playerSheet, SHEET_PLAYERS);
     if (data.length <= 1) return [];
 
@@ -224,9 +236,13 @@ function getWaitingPlayers() {
  */
 function updatePlayerMatchStats(playerId, isWinner, timestamp) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
 
   try {
+    const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
+    if (!playerSheet) {
+      Logger.log("エラー: プレイヤーシートが見つかりません。");
+      return;
+    }
     const { indices, data } = getSheetStructure(playerSheet, SHEET_PLAYERS);
     if (data.length <= 1) return;
 
@@ -280,6 +296,10 @@ function updatePlayerState(options) {
 
     // 1. プレイヤーの現在の状態を確認
     const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
+    if (!playerSheet) {
+      Logger.log("エラー: プレイヤーシートが見つかりません。");
+      return { success: false, message: "プレイヤーシートが見つかりません。" };
+    }
     const { indices: playerIndices, data: playerData } = getSheetStructure(playerSheet, SHEET_PLAYERS);
 
     let targetFound = false;
@@ -310,6 +330,10 @@ function updatePlayerState(options) {
 
     if (currentStatus === PLAYER_STATUS.IN_PROGRESS) {
       const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
+      if (!inProgressSheet) {
+        Logger.log("エラー: 対戦中シートが見つかりません。");
+        return { success: false, message: "対戦中シートが見つかりません。" };
+      }
       const { indices: matchIndices, data: matchData } = getSheetStructure(inProgressSheet, SHEET_IN_PROGRESS);
 
       for (let i = 1; i < matchData.length; i++) {
@@ -352,6 +376,10 @@ function updatePlayerState(options) {
       const currentTime = new Date();
       const formattedTime = Utilities.formatDate(currentTime, "Asia/Tokyo", "yyyy/MM/dd HH:mm:ss");
       const historySheet = ss.getSheetByName(SHEET_HISTORY);
+      if (!historySheet) {
+        Logger.log("エラー: 履歴シートが見つかりません。");
+        return { success: false, message: "履歴シートが見つかりません。" };
+      }
       getSheetStructure(historySheet, SHEET_HISTORY);
       const newId = "T" + Utilities.formatString("%04d", historySheet.getLastRow());
 
@@ -362,6 +390,10 @@ function updatePlayerState(options) {
 
       // マッチング中の卓番号を取得
       const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
+      if (!inProgressSheet) {
+        Logger.log("エラー: 対戦中シートが見つかりません。");
+        return { success: false, message: "対戦中シートが見つかりません。" };
+      }
       const { indices: matchIndices } = getSheetStructure(inProgressSheet, SHEET_IN_PROGRESS);
       const matchTableNumber = inProgressSheet.getRange(matchRow, matchIndices["卓番号"] + 1).getValue();
       const startTime = inProgressSheet.getRange(matchRow, matchIndices["対戦開始時刻"] + 1).getValue();
@@ -376,6 +408,10 @@ function updatePlayerState(options) {
     // 5. 対戦情報をクリア（対戦中の場合のみ）。卓番号は残す
     if (currentStatus === PLAYER_STATUS.IN_PROGRESS && matchRow !== -1) {
       const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
+      if (!inProgressSheet) {
+        Logger.log("エラー: 対戦中シートが見つかりません。");
+        return { success: false, message: "対戦中シートが見つかりません。" };
+      }
       inProgressSheet.getRange(matchRow, 2, 1, 6).clearContent(); // ID1から対戦時間までをクリア
     }
 

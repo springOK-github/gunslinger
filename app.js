@@ -502,7 +502,7 @@ const LOCK_TIMEOUT = 30000; // 30秒
 /**
  * スプレッドシートの排他ロックを取得します。
  * @param {string} lockName - ロックの名前（操作の種類を識別）
- * @returns {LockService.Lock} 取得したロック
+ * @returns {Object} 取得したロック
  * @throws {Error} ロックが取得できない場合
  */
 function acquireLock(lockName) {
@@ -518,7 +518,7 @@ function acquireLock(lockName) {
 
 /**
  * ロックを解放します。
- * @param {LockService.Lock} lock - 解放するロック
+ * @param {Object} lock - 解放するロック
  */
 function releaseLock(lock) {
   if (lock) {

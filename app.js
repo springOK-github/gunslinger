@@ -130,6 +130,12 @@ function endTournament() {
       return;
     }
 
+    const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
+    if (!playerSheet) {
+      ui.alert("エラー", `シートが見つかりません: ${SHEET_PLAYERS}`, ui.ButtonSet.OK);
+      return;
+    }
+
     // 進行中の対戦があるか確認し、ユーザーの確認後に別関数で強制終了処理を実行する
     const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
     if (inProgressSheet) {
@@ -164,23 +170,10 @@ function endTournament() {
     const timestamp = Utilities.formatDate(new Date(), tz, "yyyyMMdd_HHmmss");
     const baseName = `${SHEET_HISTORY}_${timestamp}`;
 
-    // コピーを作成してリネーム
-    const copied = historySheet.copyTo(ss);
+    const backupHistoryName = createSheetBackup(ss, historySheet, baseName);
+    const backupPlayerName = createSheetBackup(ss, playerSheet, `${SHEET_PLAYERS}_${timestamp}`);
 
-    // setName が衝突すると例外になるため、一意の名前を作る
-    let newName = baseName;
-    let suffix = 1;
-    while (ss.getSheetByName(newName)) {
-      newName = `${baseName}_${suffix}`;
-      suffix++;
-    }
-
-    copied.setName(newName);
-    // コピーを末尾に移動すると見やすくなる
-    ss.setActiveSheet(copied);
-    ss.moveActiveSheet(ss.getNumSheets());
-
-    Logger.log(`大会終了: 対戦履歴をバックアップしました -> ${newName}`);
+    Logger.log(`大会終了: 対戦履歴とプレイヤーをバックアップしました -> ${backupHistoryName}, ${backupPlayerName}`);
   } catch (e) {
     ui.alert("エラー", `大会終了に失敗しました: ${e.message}`, ui.ButtonSet.OK);
     Logger.log("endTournament エラー: " + e.toString());
@@ -492,6 +485,28 @@ function deleteMatchTimeUpdaterTrigger(showAlert = true) {
   }
 }
 
+/**
+ * シートをコピーし、一意の名前で末尾に配置します。
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss - スプレッドシート本体
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet - コピー対象のシート
+ * @param {string} baseName - 付与したい基本名（例: プレイヤー_20241128）
+ * @returns {string} コピー後のシート名
+ */
+function createSheetBackup(ss, sheet, baseName) {
+  const copied = sheet.copyTo(ss);
+  let newName = baseName;
+  let suffix = 1;
+  while (ss.getSheetByName(newName)) {
+    newName = `${baseName}_${suffix}`;
+    suffix++;
+  }
+
+  copied.setName(newName);
+  ss.setActiveSheet(copied);
+  ss.moveActiveSheet(ss.getNumSheets());
+  return newName;
+}
+
 // =========================================
 // 排他制御
 // =========================================
@@ -502,7 +517,7 @@ const LOCK_TIMEOUT = 30000; // 30秒
 /**
  * スプレッドシートの排他ロックを取得します。
  * @param {string} lockName - ロックの名前（操作の種類を識別）
- * @returns {LockService.Lock} 取得したロック
+ * @returns {Object} 取得したロック
  * @throws {Error} ロックが取得できない場合
  */
 function acquireLock(lockName) {
@@ -518,7 +533,7 @@ function acquireLock(lockName) {
 
 /**
  * ロックを解放します。
- * @param {LockService.Lock} lock - 解放するロック
+ * @param {Object} lock - 解放するロック
  */
 function releaseLock(lock) {
   if (lock) {

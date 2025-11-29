@@ -53,47 +53,10 @@ function startTournament() {
   // 対戦時間計測トリガーを追加
   setupMatchTimeUpdaterTrigger(false);
 
-  // 1. プレイヤーシート
-  let playerSheet = ss.getSheetByName(SHEET_PLAYERS);
-  if (!playerSheet) {
-    playerSheet = ss.insertSheet(SHEET_PLAYERS);
-  }
-  playerSheet.clear();
-  const playerHeaders = REQUIRED_HEADERS[SHEET_PLAYERS];
-  playerSheet
-    .getRange(1, 1, 1, playerHeaders.length)
-    .setValues([playerHeaders])
-    .setFontWeight("bold")
-    .setBackground("#c9daf8")
-    .setHorizontalAlignment("center");
-
-  // 2. 対戦履歴シート
-  let historySheet = ss.getSheetByName(SHEET_HISTORY);
-  if (!historySheet) {
-    historySheet = ss.insertSheet(SHEET_HISTORY);
-  }
-  historySheet.clear();
-  const historyHeaders = REQUIRED_HEADERS[SHEET_HISTORY];
-  historySheet
-    .getRange(1, 1, 1, historyHeaders.length)
-    .setValues([historyHeaders])
-    .setFontWeight("bold")
-    .setBackground("#fce5cd")
-    .setHorizontalAlignment("center");
-
-  // 3. マッチングシート
-  let inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
-  if (!inProgressSheet) {
-    inProgressSheet = ss.insertSheet(SHEET_IN_PROGRESS);
-  }
-  inProgressSheet.clear();
-  const inProgressHeaders = REQUIRED_HEADERS[SHEET_IN_PROGRESS];
-  inProgressSheet
-    .getRange(1, 1, 1, inProgressHeaders.length)
-    .setValues([inProgressHeaders])
-    .setFontWeight("bold")
-    .setBackground("#d9ead3")
-    .setHorizontalAlignment("center");
+  // 1/2/3. 必要なシートを作成してヘッダーを初期化
+  const playerSheet = ensureAndInitSheet(ss, SHEET_PLAYERS);
+  const historySheet = ensureAndInitSheet(ss, SHEET_HISTORY);
+  const inProgressSheet = ensureAndInitSheet(ss, SHEET_IN_PROGRESS);
 
   Logger.log("大会を開始します。Ready to go!!");
 }
@@ -124,9 +87,18 @@ function endTournament() {
       Logger.log("MAINTENANCE_MODE の設定に失敗: " + e && e.toString());
     }
 
+    // 対戦時間計測タイマーの停止
+    deleteMatchTimeUpdaterTrigger(false);
+
     const historySheet = ss.getSheetByName(SHEET_HISTORY);
     if (!historySheet) {
       ui.alert("エラー", `シートが見つかりません: ${SHEET_HISTORY}`, ui.ButtonSet.OK);
+      return;
+    }
+
+    const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
+    if (!playerSheet) {
+      ui.alert("エラー", `シートが見つかりません: ${SHEET_PLAYERS}`, ui.ButtonSet.OK);
       return;
     }
 
@@ -164,23 +136,18 @@ function endTournament() {
     const timestamp = Utilities.formatDate(new Date(), tz, "yyyyMMdd_HHmmss");
     const baseName = `${SHEET_HISTORY}_${timestamp}`;
 
-    // コピーを作成してリネーム
-    const copied = historySheet.copyTo(ss);
+    const backupHistoryName = createSheetBackup(ss, historySheet, baseName);
+    const backupPlayerName = createSheetBackup(ss, playerSheet, `${SHEET_PLAYERS}_${timestamp}`);
+    Logger.log(`大会終了: 対戦履歴とプレイヤーをバックアップしました -> ${backupHistoryName}, ${backupPlayerName}`);
 
-    // setName が衝突すると例外になるため、一意の名前を作る
-    let newName = baseName;
-    let suffix = 1;
-    while (ss.getSheetByName(newName)) {
-      newName = `${baseName}_${suffix}`;
-      suffix++;
+    // バックアップ後にオリジナルのシートを初期化（ヘッダー再作成）
+    try {
+      ensureAndInitSheet(ss, SHEET_PLAYERS);
+      ensureAndInitSheet(ss, SHEET_HISTORY);
+      ensureAndInitSheet(ss, SHEET_IN_PROGRESS);
+    } catch (e) {
+      Logger.log("endTournament: シート初期化に失敗しました: " + (e && e.toString()));
     }
-
-    copied.setName(newName);
-    // コピーを末尾に移動すると見やすくなる
-    ss.setActiveSheet(copied);
-    ss.moveActiveSheet(ss.getNumSheets());
-
-    Logger.log(`大会終了: 対戦履歴をバックアップしました -> ${newName}`);
   } catch (e) {
     ui.alert("エラー", `大会終了に失敗しました: ${e.message}`, ui.ButtonSet.OK);
     Logger.log("endTournament エラー: " + e.toString());
@@ -490,6 +457,60 @@ function deleteMatchTimeUpdaterTrigger(showAlert = true) {
       }
     }
   }
+}
+
+/**
+ * シートをコピーし、一意の名前で末尾に配置します。
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss - スプレッドシート本体
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet - コピー対象のシート
+ * @param {string} baseName - 付与したい基本名（例: プレイヤー_20241128）
+ * @returns {string} コピー後のシート名
+ */
+function createSheetBackup(ss, sheet, baseName) {
+  const copied = sheet.copyTo(ss);
+  let newName = baseName;
+  let suffix = 1;
+  while (ss.getSheetByName(newName)) {
+    newName = `${baseName}_${suffix}`;
+    suffix++;
+  }
+
+  copied.setName(newName);
+  ss.setActiveSheet(copied);
+  ss.moveActiveSheet(ss.getNumSheets());
+  return newName;
+}
+
+/**
+ * 指定したシート名のシートを取得（なければ作成）し、ヘッダー行をクリアして再作成します。
+ * ヘッダーの内容は `REQUIRED_HEADERS` から取得し、シート名ごとに背景色を設定します。
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss
+ * @param {string} sheetName
+ * @returns {GoogleAppsScript.Spreadsheet.Sheet} 初期化されたシート
+ */
+function ensureAndInitSheet(ss, sheetName) {
+  let sheet = ss.getSheetByName(sheetName);
+  if (!sheet) sheet = ss.insertSheet(sheetName);
+
+  // ヘッダーをクリアして再作成
+  sheet.clear();
+  const headers = REQUIRED_HEADERS[sheetName] || [];
+
+  // シートごとの背景色
+  const bgMap = {};
+  bgMap[SHEET_PLAYERS] = "#c9daf8";
+  bgMap[SHEET_HISTORY] = "#fce5cd";
+  bgMap[SHEET_IN_PROGRESS] = "#d9ead3";
+
+  const bg = bgMap[sheetName] || null;
+
+  if (headers.length > 0) {
+    const range = sheet.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight("bold");
+    if (bg) range.setBackground(bg);
+    range.setHorizontalAlignment("center");
+  }
+
+  return sheet;
 }
 
 // =========================================

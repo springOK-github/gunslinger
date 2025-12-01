@@ -438,74 +438,75 @@ function correctMatchResult() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let lock = null;
 
+  // 1. 対戦IDの入力（ロック不要）
+  const response = ui.prompt("対戦結果の修正", "修正する対戦IDの**数字部分のみ**を入力してください (例: T0001なら「1」)。", ui.ButtonSet.OK_CANCEL);
+
+  if (response.getSelectedButton() !== ui.Button.OK) {
+    ui.alert("処理をキャンセルしました。");
+    return;
+  }
+
+  const rawId = response.getResponseText().trim();
+  if (!/^\d+$/.test(rawId)) {
+    ui.alert("エラー", "IDは数字のみで入力してください。", ui.ButtonSet.OK);
+    return;
+  }
+
+  const matchId = "T" + Utilities.formatString("%04d", parseInt(rawId, 10));
+
+  // 2. 対戦履歴から該当の対戦を検索（ロック不要の読み取り）
+  const historySheet = ss.getSheetByName(SHEET_HISTORY);
+  if (!historySheet) {
+    ui.alert("エラー", `シート「${SHEET_HISTORY}」が見つかりません。`, ui.ButtonSet.OK);
+    return;
+  }
+  const { indices: historyIndices, data: historyData } = getSheetStructure(historySheet, SHEET_HISTORY);
+
+  let matchRow = -1;
+  let matchDataRow = null;
+
+  for (let i = 1; i < historyData.length; i++) {
+    const row = historyData[i];
+    if (row[historyIndices["対戦ID"]] === matchId) {
+      matchRow = i + 1;
+      matchDataRow = row;
+      break;
+    }
+  }
+
+  if (matchRow === -1) {
+    ui.alert("エラー", `対戦ID ${matchId} が見つかりません。`, ui.ButtonSet.OK);
+    return;
+  }
+
+  // 3. 現在の勝者と敗者を取得
+  const currentWinnerId = matchDataRow[historyIndices["ID1"]];
+  const currentWinnerName = matchDataRow[historyIndices["プレイヤー1"]];
+  const currentLoserId = matchDataRow[historyIndices["ID2"]];
+  const currentLoserName = matchDataRow[historyIndices["プレイヤー2"]];
+
+  // 4. 修正の確認（ロック不要）
+  const confirmResponse = ui.alert(
+    "勝敗修正の確認",
+    `対戦ID: ${matchId}\n\n` +
+      `【現在】\n` +
+      `勝者: ${currentWinnerName} (${currentWinnerId})\n` +
+      `敗者: ${currentLoserName} (${currentLoserId})\n\n` +
+      `【修正後】\n` +
+      `勝者: ${currentLoserName} (${currentLoserId})\n` +
+      `敗者: ${currentWinnerName} (${currentWinnerId})\n\n` +
+      "勝敗を入れ替えますか？",
+    ui.ButtonSet.YES_NO
+  );
+
+  if (confirmResponse !== ui.Button.YES) {
+    ui.alert("処理をキャンセルしました。");
+    return;
+  }
+
   try {
-    // 1. 対戦IDの入力
-    const response = ui.prompt("対戦結果の修正", "修正する対戦IDの**数字部分のみ**を入力してください (例: T0001なら「1」)。", ui.ButtonSet.OK_CANCEL);
-
-    if (response.getSelectedButton() !== ui.Button.OK) {
-      ui.alert("処理をキャンセルしました。");
-      return;
-    }
-
-    const rawId = response.getResponseText().trim();
-    if (!/^\d+$/.test(rawId)) {
-      ui.alert("エラー", "IDは数字のみで入力してください。", ui.ButtonSet.OK);
-      return;
-    }
-
-    const matchId = "T" + Utilities.formatString("%04d", parseInt(rawId, 10));
-
+    // 確認後にロックを取得して更新処理
     lock = acquireLock("対戦結果の修正");
-
-    // 2. 対戦履歴から該当の対戦を検索
-    const historySheet = ss.getSheetByName(SHEET_HISTORY);
-    if (!historySheet) {
-      ui.alert("エラー", `シート「${SHEET_HISTORY}」が見つかりません。`, ui.ButtonSet.OK);
-      return;
-    }
-    const { indices: historyIndices, data: historyData } = getSheetStructure(historySheet, SHEET_HISTORY);
-
-    let matchRow = -1;
-    let matchData = null;
-
-    for (let i = 1; i < historyData.length; i++) {
-      const row = historyData[i];
-      if (row[historyIndices["対戦ID"]] === matchId) {
-        matchRow = i + 1;
-        matchData = row;
-        break;
-      }
-    }
-
-    if (matchRow === -1) {
-      ui.alert("エラー", `対戦ID ${matchId} が見つかりません。`, ui.ButtonSet.OK);
-      return;
-    }
-
-    // 3. 現在の勝者と敗者を取得
-    const currentWinnerId = matchData[historyIndices["ID1"]];
-    const currentWinnerName = matchData[historyIndices["プレイヤー1"]];
-    const currentLoserId = matchData[historyIndices["ID2"]];
-    const currentLoserName = matchData[historyIndices["プレイヤー2"]];
-
-    // 4. 修正の確認
-    const confirmResponse = ui.alert(
-      "勝敗修正の確認",
-      `対戦ID: ${matchId}\n\n` +
-        `【現在】\n` +
-        `勝者: ${currentWinnerName} (${currentWinnerId})\n` +
-        `敗者: ${currentLoserName} (${currentLoserId})\n\n` +
-        `【修正後】\n` +
-        `勝者: ${currentLoserName} (${currentLoserId})\n` +
-        `敗者: ${currentWinnerName} (${currentWinnerId})\n\n` +
-        "勝敗を入れ替えますか？",
-      ui.ButtonSet.YES_NO
-    );
-
-    if (confirmResponse !== ui.Button.YES) {
-      ui.alert("処理をキャンセルしました。");
-      return;
-    }
 
     // 5. 対戦履歴を更新（勝者と敗者を入れ替え）
     historySheet.getRange(matchRow, historyIndices["ID1"] + 1).setValue(currentLoserId);
@@ -566,13 +567,14 @@ function updateAllMatchTimes() {
   let matchLock = null;
 
   try {
+    matchLock = acquireLock("対戦時間の更新");
+
     const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
     if (!inProgressSheet) {
       Logger.log(`エラー: シート「${SHEET_IN_PROGRESS}」が見つかりません。`);
       return;
     }
     const { indices, data } = getSheetStructure(inProgressSheet, SHEET_IN_PROGRESS);
-    matchLock = acquireLock("対戦結果の記録");
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
       const startTime = new Date(row[indices["対戦開始時刻"]]);

@@ -17,19 +17,22 @@ function registerPlayer() {
   const ui = SpreadsheetApp.getUi();
   let lock = null;
 
+  // ロック取得前にUI入力を完了させる
+  const response = ui.prompt("プレイヤー登録", "プレイヤー名を入力してください：", ui.ButtonSet.OK_CANCEL);
+
+  if (response.getSelectedButton() == ui.Button.CANCEL) {
+    Logger.log("プレイヤー登録がキャンセルされました。");
+    return;
+  }
+
+  const inputPlayerName = response.getResponseText().trim();
+
   try {
+    lock = acquireLock("プレイヤー登録");
+
     const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
     if (!playerSheet) {
       ui.alert("エラー: プレイヤーシートが見つかりません。");
-      return;
-    }
-    lock = acquireLock("プレイヤー登録");
-    getSheetStructure(playerSheet, SHEET_PLAYERS);
-
-    const response = ui.prompt("プレイヤー登録", "プレイヤー名を入力してください：", ui.ButtonSet.OK_CANCEL);
-
-    if (response.getSelectedButton() == ui.Button.CANCEL) {
-      Logger.log("プレイヤー登録がキャンセルされました。");
       return;
     }
 
@@ -51,12 +54,14 @@ function registerPlayer() {
     const newId = PLAYER_ID_PREFIX + Utilities.formatString(`%0${ID_DIGITS}d`, newIdNumber);
 
     // プレイヤー名が空の場合はIDを使用
-    let playerName = response.getResponseText().trim();
+    let playerName = inputPlayerName;
     if (!playerName) {
       playerName = newId;
     }
 
-    // 名前確認ダイアログ
+    // ロックを一旦解放して確認ダイアログを表示
+    releaseLock(lock);
+    lock = null;
 
     const confirmResponse = ui.alert("登録確認", `プレイヤー名: ${playerName}\nプレイヤーID: ${newId}\n\nこの内容で登録しますか？`, ui.ButtonSet.YES_NO);
 
@@ -64,6 +69,9 @@ function registerPlayer() {
       Logger.log("プレイヤー登録が確認段階でキャンセルされました。");
       return;
     }
+
+    // 再度ロックを取得して登録処理
+    lock = acquireLock("プレイヤー登録");
 
     const currentTime = new Date();
     const formattedTime = Utilities.formatDate(currentTime, "Asia/Tokyo", "yyyy/MM/dd HH:mm:ss");
@@ -121,58 +129,68 @@ function returnPlayerFromResting() {
   const playerId = promptPlayerId("休憩からの復帰", "復帰するプレイヤーIDの**数字部分のみ**を入力してください (例: P001なら「1」)。");
   if (!playerId) return;
 
-  // プレイヤーの現在の状態を確認
+  // プレイヤーの現在の状態を確認（ロックなしで読み取り）
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let lock = null;
 
+  // まず状態確認と確認ダイアログ（ロック不要）
+  const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
+  if (!playerSheet) {
+    ui.alert("エラー: プレイヤーシートが見つかりません。");
+    return;
+  }
+
+  const { indices, data } = getSheetStructure(playerSheet, SHEET_PLAYERS);
+
+  let found = false;
+  let currentStatus = null;
+  let playerName = playerId;
+  let targetRowIndex = -1;
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (row[indices["プレイヤーID"]] === playerId) {
+      found = true;
+      currentStatus = row[indices["参加状況"]];
+      playerName = row[indices["プレイヤー名"]];
+      targetRowIndex = i + 1;
+      break;
+    }
+  }
+
+  if (!found) {
+    ui.alert("エラー", `プレイヤー ${playerId} が見つかりません。`, ui.ButtonSet.OK);
+    return;
+  }
+
+  if (currentStatus !== PLAYER_STATUS.RESTING) {
+    ui.alert("エラー", `プレイヤー名: ${playerName}\nプレイヤーID: ${playerId}\n\n休憩中ではありません（現在: ${currentStatus}）。`, ui.ButtonSet.OK);
+    return;
+  }
+
+  const confirmResponse = ui.alert(
+    "復帰の確認",
+    `プレイヤー名: ${playerName}\nプレイヤーID: ${playerId}\n\n休憩から待機状態に復帰させます。\n\nよろしいですか？`,
+    ui.ButtonSet.YES_NO
+  );
+
+  if (confirmResponse !== ui.Button.YES) {
+    ui.alert("処理をキャンセルしました。");
+    return;
+  }
+
   try {
-    const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
-    if (!playerSheet) {
+    // 確認後にロックを取得して状態変更
+    lock = acquireLock("休憩からの復帰");
+
+    // 状態を待機に変更（ロック取得後に再度シートを取得して最新状態で更新）
+    const freshPlayerSheet = ss.getSheetByName(SHEET_PLAYERS);
+    if (!freshPlayerSheet) {
       ui.alert("エラー: プレイヤーシートが見つかりません。");
       return;
     }
-    lock = acquireLock("休憩からの復帰");
-    const { indices, data } = getSheetStructure(playerSheet, SHEET_PLAYERS);
-
-    let found = false;
-    let currentStatus = null;
-    let playerName = playerId;
-    let targetRowIndex = -1;
-
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      if (row[indices["プレイヤーID"]] === playerId) {
-        found = true;
-        currentStatus = row[indices["参加状況"]];
-        playerName = row[indices["プレイヤー名"]];
-        targetRowIndex = i + 1;
-        break;
-      }
-    }
-
-    if (!found) {
-      ui.alert("エラー", `プレイヤー ${playerId} が見つかりません。`, ui.ButtonSet.OK);
-      return;
-    }
-
-    if (currentStatus !== PLAYER_STATUS.RESTING) {
-      ui.alert("エラー", `プレイヤー名: ${playerName}\nプレイヤーID: ${playerId}\n\n休憩中ではありません（現在: ${currentStatus}）。`, ui.ButtonSet.OK);
-      return;
-    }
-
-    const confirmResponse = ui.alert(
-      "復帰の確認",
-      `プレイヤー名: ${playerName}\nプレイヤーID: ${playerId}\n\n休憩から待機状態に復帰させます。\n\nよろしいですか？`,
-      ui.ButtonSet.YES_NO
-    );
-
-    if (confirmResponse !== ui.Button.YES) {
-      ui.alert("処理をキャンセルしました。");
-      return;
-    }
-
-    // 状態を待機に変更
-    playerSheet.getRange(targetRowIndex, indices["参加状況"] + 1).setValue(PLAYER_STATUS.WAITING);
+    const { indices: freshIndices } = getSheetStructure(freshPlayerSheet, SHEET_PLAYERS);
+    freshPlayerSheet.getRange(targetRowIndex, freshIndices["参加状況"] + 1).setValue(PLAYER_STATUS.WAITING);
 
     // 待機者が2人以上いれば自動マッチング
     const waitingPlayersCount = getWaitingPlayers().length;
@@ -180,6 +198,8 @@ function returnPlayerFromResting() {
       Logger.log(`復帰後、待機プレイヤーが ${waitingPlayersCount} 人いるため、自動でマッチングを開始します。`);
       matchPlayers();
     }
+
+    Logger.log(`プレイヤー ${playerId} を休憩から復帰させました。`);
   } catch (e) {
     ui.alert("エラーが発生しました: " + e.toString());
     Logger.log("returnPlayerFromResting エラー: " + e.toString());

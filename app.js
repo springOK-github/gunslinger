@@ -425,34 +425,39 @@ function setupMatchTimeUpdaterTrigger(showAlert = true) {
  */
 
 function deleteMatchTimeUpdaterTrigger(showAlert = true) {
-  // 既存のトリガーを削除
-  const triggers = ScriptApp.getProjectTriggers();
-  if (triggers.length === 0 && showAlert) {
-    const ui = SpreadsheetApp.getUi();
-    ui.alert("タイマーは既に停止されています。", ui.ButtonSet.OK);
-    return;
-  }
-  for (const trigger of triggers) {
-    if (trigger.getHandlerFunction() === "updateAllMatchTimes") {
-      if (showAlert) {
-        // 確認するダイアログを表示
-        const ui = SpreadsheetApp.getUi();
-        const response = ui.alert("対戦時間計測タイマーの停止", "対戦時間計測タイマーを停止しますか？", ui.ButtonSet.YES_NO);
+  try {
+    // 既存のトリガーを取得
+    const triggers = ScriptApp.getProjectTriggers();
 
-        if (response !== ui.Button.YES) {
-          ui.alert("タイマーの停止をキャンセルしました。");
-          return;
-        }
+    // updateAllMatchTimes トリガーを探す
+    const matchTimeTriggers = triggers.filter((t) => t.getHandlerFunction() === "updateAllMatchTimes");
+
+    if (matchTimeTriggers.length === 0 && showAlert) {
+      const ui = SpreadsheetApp.getUi();
+      ui.alert("タイマーは既に停止されています。", ui.ButtonSet.OK);
+      return;
+    }
+
+    // 確認ダイアログを表示（showAlert=true の場合のみ）
+    if (showAlert) {
+      const ui = SpreadsheetApp.getUi();
+      const response = ui.alert("対戦時間計測タイマーの停止", "対戦時間計測タイマーを停止しますか？", ui.ButtonSet.YES_NO);
+
+      if (response !== ui.Button.YES) {
+        ui.alert("タイマーの停止をキャンセルしました。");
+        return;
       }
-      showAlert = false; // 一度表示したら表示しない
+    }
 
+    // トリガーを削除
+    for (const trigger of matchTimeTriggers) {
       ScriptApp.deleteTrigger(trigger);
-    } else {
-      // メッセージ
-      if (showAlert) {
-        const ui = SpreadsheetApp.getUi();
-        ui.alert("タイマーは既に停止されています。", ui.ButtonSet.OK);
-      }
+    }
+  } catch (e) {
+    Logger.log("deleteMatchTimeUpdaterTrigger エラー: " + (e && e.toString()));
+    if (showAlert) {
+      const ui = SpreadsheetApp.getUi();
+      ui.alert("エラー", "タイマーの停止に失敗しました: " + e.message, ui.ButtonSet.OK);
     }
   }
 }

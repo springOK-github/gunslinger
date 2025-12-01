@@ -588,6 +588,8 @@ function updateAllMatchTimes() {
       }
     }
     Logger.log(`対戦時間が ${updatedCount} 卓分更新されました。`);
+  } catch (e) {
+    Logger.log("updateAllMatchTimes エラー: " + e?.toString());
   } finally {
     releaseLock(matchLock);
   }

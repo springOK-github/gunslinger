@@ -59,19 +59,13 @@ function registerPlayer() {
       playerName = newId;
     }
 
-    // ロックを一旦解放して確認ダイアログを表示
-    releaseLock(lock);
-    lock = null;
-
+    // 確認ダイアログを表示
     const confirmResponse = ui.alert("登録確認", `プレイヤー名: ${playerName}\nプレイヤーID: ${newId}\n\nこの内容で登録しますか？`, ui.ButtonSet.YES_NO);
 
     if (confirmResponse == ui.Button.NO) {
       Logger.log("プレイヤー登録が確認段階でキャンセルされました。");
       return;
     }
-
-    // 再度ロックを取得して登録処理
-    lock = acquireLock("プレイヤー登録");
 
     const currentTime = new Date();
     const formattedTime = Utilities.formatDate(currentTime, "Asia/Tokyo", "yyyy/MM/dd HH:mm:ss");

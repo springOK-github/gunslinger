@@ -54,9 +54,9 @@ function startTournament() {
   setupMatchTimeUpdaterTrigger(false);
 
   // 1/2/3. 必要なシートを作成してヘッダーを初期化
-  const playerSheet = ensureAndInitSheet(ss, SHEET_PLAYERS);
-  const historySheet = ensureAndInitSheet(ss, SHEET_HISTORY);
-  const inProgressSheet = ensureAndInitSheet(ss, SHEET_IN_PROGRESS);
+  ensureAndInitSheet(ss, SHEET_PLAYERS);
+  ensureAndInitSheet(ss, SHEET_HISTORY);
+  ensureAndInitSheet(ss, SHEET_IN_PROGRESS);
 
   Logger.log("大会を開始します。Ready to go!!");
 }
@@ -84,7 +84,7 @@ function endTournament() {
     try {
       PropertiesService.getDocumentProperties().setProperty("MAINTENANCE_MODE", "1");
     } catch (e) {
-      Logger.log("MAINTENANCE_MODE の設定に失敗: " + e && e.toString());
+      Logger.log("MAINTENANCE_MODE の設定に失敗: " + e?.toString());
     }
 
     // 対戦時間計測タイマーの停止
@@ -154,7 +154,7 @@ function endTournament() {
     try {
       PropertiesService.getDocumentProperties().deleteProperty("MAINTENANCE_MODE");
     } catch (e) {
-      Logger.log("MAINTENANCE_MODE の解除に失敗: " + e && e.toString());
+      Logger.log("MAINTENANCE_MODE の解除に失敗: " + e?.toString());
     }
 
     releaseLock(lock);

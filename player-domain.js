@@ -56,7 +56,7 @@ function registerPlayer() {
     // プレイヤー名が空の場合はIDを使用
     let playerName = inputPlayerName;
     if (!playerName) {
-      playerName = newId;
+      playerName = PLAYER_NAME_PREFIX + Utilities.formatString(`%0${ID_DIGITS}d`, newIdNumber);
     }
 
     // 確認ダイアログを表示

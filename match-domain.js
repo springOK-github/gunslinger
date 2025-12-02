@@ -481,9 +481,9 @@ function correctMatchResult() {
 
   // 3. 現在の勝者と敗者を取得
   const currentWinnerId = matchDataRow[historyIndices["ID1"]];
-  const currentWinnerName = matchDataRow[historyIndices["プレイヤー1"]];
+  const currentWinnerName = matchDataRow[historyIndices["勝者名"]];
   const currentLoserId = matchDataRow[historyIndices["ID2"]];
-  const currentLoserName = matchDataRow[historyIndices["プレイヤー2"]];
+  const currentLoserName = matchDataRow[historyIndices["敗者名"]];
 
   // 4. 修正の確認（ロック不要）
   const confirmResponse = ui.alert(
@@ -510,10 +510,9 @@ function correctMatchResult() {
 
     // 5. 対戦履歴を更新（勝者と敗者を入れ替え）
     historySheet.getRange(matchRow, historyIndices["ID1"] + 1).setValue(currentLoserId);
-    historySheet.getRange(matchRow, historyIndices["プレイヤー1"] + 1).setValue(currentLoserName);
-    historySheet.getRange(matchRow, historyIndices["ID2"] + 1).setValue(currentWinnerId);
-    historySheet.getRange(matchRow, historyIndices["プレイヤー2"] + 1).setValue(currentWinnerName);
     historySheet.getRange(matchRow, historyIndices["勝者名"] + 1).setValue(currentLoserName);
+    historySheet.getRange(matchRow, historyIndices["ID2"] + 1).setValue(currentWinnerId);
+    historySheet.getRange(matchRow, historyIndices["敗者名"] + 1).setValue(currentWinnerName);
 
     // 6. プレイヤーの統計を修正
     const playerSheet = ss.getSheetByName(SHEET_PLAYERS);

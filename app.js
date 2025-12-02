@@ -215,33 +215,12 @@ function endAllActiveMatches() {
   const now = new Date();
   const endTimeStr = Utilities.formatDate(now, tz, "yyyy/MM/dd HH:mm:ss");
 
-  const rowsToAppend = [];
   for (const item of activeRows) {
     const r = item.row;
-    const tableNumber = r[inIdx["卓番号"]] || "";
     const id1 = r[inIdx["ID1"]] || "";
-    const name1 = r[inIdx["プレイヤー1"]] || id1;
     const id2 = r[inIdx["ID2"]] || "";
-    const name2 = r[inIdx["プレイヤー2"]] || id2;
 
     maxNum++;
-    const matchId = "T" + Utilities.formatString("%04d", maxNum);
-    const winnerName = "大会終了";
-    const matchTime = "";
-
-    const newRow = [];
-    newRow[histIdx["対戦ID"]] = matchId;
-    newRow[histIdx["卓番号"]] = tableNumber;
-    newRow[histIdx["ID1"]] = id1;
-    newRow[histIdx["プレイヤー1"]] = name1;
-    newRow[histIdx["ID2"]] = id2;
-    newRow[histIdx["プレイヤー2"]] = name2;
-    newRow[histIdx["勝者名"]] = winnerName;
-    newRow[histIdx["対戦終了時刻"]] = endTimeStr;
-    newRow[histIdx["対戦時間"]] = matchTime;
-
-    rowsToAppend.push(newRow);
-
     // プレイヤー状態を待機に戻す
     try {
       updatePlayerState({
@@ -265,17 +244,6 @@ function endAllActiveMatches() {
     } catch (e) {
       Logger.log("updatePlayerState error for %s: %s", id2, e && e.toString());
     }
-  }
-
-  // 追記
-  const appendStartRow = historySheet.getLastRow() + 1;
-  for (let i = 0; i < rowsToAppend.length; i++) {
-    const rowVals = [];
-    const headers = REQUIRED_HEADERS[SHEET_HISTORY];
-    for (let j = 0; j < headers.length; j++) {
-      rowVals.push(rowsToAppend[i][j] || "");
-    }
-    historySheet.getRange(appendStartRow + i, 1, 1, rowVals.length).setValues([rowVals]);
   }
 
   // 進行中シートの該当行はクリアする

@@ -166,13 +166,12 @@ function getLastTableNumber(playerId) {
   // 最新の対戦履歴を探す
   for (let i = historyData.length - 1; i > 0; i--) {
     const row = historyData[i];
-    const id1 = row[historyIndices["ID1"]];
-    const id2 = row[historyIndices["ID2"]];
-    const winner = row[historyIndices["勝者名"]];
+    const winnerId = row[historyIndices["ID1"]];
     const tableNumber = row[historyIndices["卓番号"]];
+    const duration = row[historyIndices["対戦時間"]];
 
-    // 勝者のプレイヤー名から勝者IDを特定
-    if (getPlayerName(playerId) === winner && (id1 === playerId || id2 === playerId)) {
+    // 対戦時間が空の行は未決着扱い（大会終了など）としてスキップ
+    if (winnerId === playerId && duration) {
       return tableNumber;
     }
   }

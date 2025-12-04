@@ -142,7 +142,7 @@ function endTournament() {
 
     // バックアップ後にオリジナルのシートを初期化（ヘッダー再作成）
     try {
-      ensureAndInitSheet(ss, SHEET_HISTORY);
+      ensureAndInitSheet(ss, SHEET_IN_PROGRESS); // 卓数消すため進行中シートのみ初期化
     } catch (e) {
       Logger.log("endTournament: シート初期化に失敗しました: " + (e && e.toString()));
     }

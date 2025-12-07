@@ -17,9 +17,6 @@ function onOpen() {
     .addItem("🏁 大会開始", "startTournament")
     .addItem("🏁 大会終了", "endTournament")
     .addSeparator()
-    .addItem("⏱️ 経過時間更新の開始", "setupMatchTimeUpdaterTrigger")
-    .addItem("⏹️ 経過時間更新の停止", "deleteMatchTimeUpdaterTrigger")
-    .addSeparator()
     .addItem("➕ プレイヤーを追加する", "registerPlayer")
     .addItem("☕ プレイヤーを休憩にする", "restPlayer")
     .addItem("↩️ 休憩から復帰させる", "returnPlayerFromResting")
@@ -54,9 +51,9 @@ function startTournament() {
   setupMatchTimeUpdaterTrigger(false);
 
   // 1/2/3. 必要なシートを作成してヘッダーを初期化
-  ensureAndInitSheet(ss, SHEET_PLAYERS);
-  ensureAndInitSheet(ss, SHEET_HISTORY);
-  ensureAndInitSheet(ss, SHEET_IN_PROGRESS);
+  const playerSheet = ensureAndInitSheet(ss, SHEET_PLAYERS);
+  const historySheet = ensureAndInitSheet(ss, SHEET_HISTORY);
+  const inProgressSheet = ensureAndInitSheet(ss, SHEET_IN_PROGRESS);
 
   Logger.log("大会を開始します。Ready to go!!");
 }
@@ -84,7 +81,7 @@ function endTournament() {
     try {
       PropertiesService.getDocumentProperties().setProperty("MAINTENANCE_MODE", "1");
     } catch (e) {
-      Logger.log("MAINTENANCE_MODE の設定に失敗: " + e?.toString());
+      Logger.log("MAINTENANCE_MODE の設定に失敗: " + e && e.toString());
     }
 
     // 対戦時間計測タイマーの停止
@@ -142,7 +139,7 @@ function endTournament() {
 
     // バックアップ後にオリジナルのシートを初期化（ヘッダー再作成）
     try {
-      ensureAndInitSheet(ss, SHEET_IN_PROGRESS); // 卓数消すため進行中シートのみ初期化
+      ensureAndInitSheet(ss, SHEET_HISTORY);
     } catch (e) {
       Logger.log("endTournament: シート初期化に失敗しました: " + (e && e.toString()));
     }
@@ -154,7 +151,7 @@ function endTournament() {
     try {
       PropertiesService.getDocumentProperties().deleteProperty("MAINTENANCE_MODE");
     } catch (e) {
-      Logger.log("MAINTENANCE_MODE の解除に失敗: " + e?.toString());
+      Logger.log("MAINTENANCE_MODE の解除に失敗: " + e && e.toString());
     }
 
     releaseLock(lock);
@@ -215,12 +212,33 @@ function endAllActiveMatches() {
   const now = new Date();
   const endTimeStr = Utilities.formatDate(now, tz, "yyyy/MM/dd HH:mm:ss");
 
+  const rowsToAppend = [];
   for (const item of activeRows) {
     const r = item.row;
+    const tableNumber = r[inIdx["卓番号"]] || "";
     const id1 = r[inIdx["ID1"]] || "";
+    const name1 = r[inIdx["プレイヤー1"]] || id1;
     const id2 = r[inIdx["ID2"]] || "";
+    const name2 = r[inIdx["プレイヤー2"]] || id2;
 
     maxNum++;
+    const matchId = "T" + Utilities.formatString("%04d", maxNum);
+    const winnerName = "大会終了";
+    const matchTime = "";
+
+    const newRow = [];
+    newRow[histIdx["対戦ID"]] = matchId;
+    newRow[histIdx["卓番号"]] = tableNumber;
+    newRow[histIdx["ID1"]] = id1;
+    newRow[histIdx["プレイヤー1"]] = name1;
+    newRow[histIdx["ID2"]] = id2;
+    newRow[histIdx["プレイヤー2"]] = name2;
+    newRow[histIdx["勝者名"]] = winnerName;
+    newRow[histIdx["対戦終了時刻"]] = endTimeStr;
+    newRow[histIdx["対戦時間"]] = matchTime;
+
+    rowsToAppend.push(newRow);
+
     // プレイヤー状態を待機に戻す
     try {
       updatePlayerState({
@@ -244,6 +262,17 @@ function endAllActiveMatches() {
     } catch (e) {
       Logger.log("updatePlayerState error for %s: %s", id2, e && e.toString());
     }
+  }
+
+  // 追記
+  const appendStartRow = historySheet.getLastRow() + 1;
+  for (let i = 0; i < rowsToAppend.length; i++) {
+    const rowVals = [];
+    const headers = REQUIRED_HEADERS[SHEET_HISTORY];
+    for (let j = 0; j < headers.length; j++) {
+      rowVals.push(rowsToAppend[i][j] || "");
+    }
+    historySheet.getRange(appendStartRow + i, 1, 1, rowVals.length).setValues([rowVals]);
   }
 
   // 進行中シートの該当行はクリアする
@@ -393,39 +422,34 @@ function setupMatchTimeUpdaterTrigger(showAlert = true) {
  */
 
 function deleteMatchTimeUpdaterTrigger(showAlert = true) {
-  try {
-    // 既存のトリガーを取得
-    const triggers = ScriptApp.getProjectTriggers();
+  // 既存のトリガーを削除
+  const triggers = ScriptApp.getProjectTriggers();
+  if (triggers.length === 0 && showAlert) {
+    const ui = SpreadsheetApp.getUi();
+    ui.alert("タイマーは既に停止されています。", ui.ButtonSet.OK);
+    return;
+  }
+  for (const trigger of triggers) {
+    if (trigger.getHandlerFunction() === "updateAllMatchTimes") {
+      if (showAlert) {
+        // 確認するダイアログを表示
+        const ui = SpreadsheetApp.getUi();
+        const response = ui.alert("対戦時間計測タイマーの停止", "対戦時間計測タイマーを停止しますか？", ui.ButtonSet.YES_NO);
 
-    // updateAllMatchTimes トリガーを探す
-    const matchTimeTriggers = triggers.filter((t) => t.getHandlerFunction() === "updateAllMatchTimes");
-
-    if (matchTimeTriggers.length === 0 && showAlert) {
-      const ui = SpreadsheetApp.getUi();
-      ui.alert("タイマーは既に停止されています。", ui.ButtonSet.OK);
-      return;
-    }
-
-    // 確認ダイアログを表示（showAlert=true の場合のみ）
-    if (showAlert) {
-      const ui = SpreadsheetApp.getUi();
-      const response = ui.alert("対戦時間計測タイマーの停止", "対戦時間計測タイマーを停止しますか？", ui.ButtonSet.YES_NO);
-
-      if (response !== ui.Button.YES) {
-        ui.alert("タイマーの停止をキャンセルしました。");
-        return;
+        if (response !== ui.Button.YES) {
+          ui.alert("タイマーの停止をキャンセルしました。");
+          return;
+        }
       }
-    }
+      showAlert = false; // 一度表示したら表示しない
 
-    // トリガーを削除
-    for (const trigger of matchTimeTriggers) {
       ScriptApp.deleteTrigger(trigger);
-    }
-  } catch (e) {
-    Logger.log("deleteMatchTimeUpdaterTrigger エラー: " + (e && e.toString()));
-    if (showAlert) {
-      const ui = SpreadsheetApp.getUi();
-      ui.alert("エラー", "タイマーの停止に失敗しました: " + e.message, ui.ButtonSet.OK);
+    } else {
+      // メッセージ
+      if (showAlert) {
+        const ui = SpreadsheetApp.getUi();
+        ui.alert("タイマーは既に停止されています。", ui.ButtonSet.OK);
+      }
     }
   }
 }

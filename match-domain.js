@@ -165,19 +165,34 @@ function writeMatchResults(params) {
     let targetRow = null;
     let tableNumber = null;
 
-    // 勝者の前回使用した卓を確認
-    const lastTable = getLastTableNumber(p1Id);
-    if (lastTable) {
-      const validation = validateTableNumber(lastTable);
-      if (validation.isValid && !usedTables.has(lastTable)) {
-        const availableTableIndex = availableTables.findIndex((t) => t.tableNumber === lastTable);
-        if (availableTableIndex !== -1) {
-          const table = availableTables.splice(availableTableIndex, 1)[0];
-          targetRow = table.row;
-          tableNumber = table.tableNumber;
-          usedTables.add(tableNumber);
-        }
-      }
+    // 両者の直近使用卓を確認して、利用可能な方を優先して再利用する
+    const lastTableP1 = getLastTableNumber(p1Id);
+    const lastTableP2 = getLastTableNumber(p2Id);
+
+    function isTableAvailableForReuse(tableNum) {
+      if (!tableNum) return false;
+      const validation = validateTableNumber(tableNum);
+      if (!validation.isValid) return false;
+      if (usedTables.has(tableNum)) return false; // 既に今回割当済み
+      const availableIndex = availableTables.findIndex((t) => t.tableNumber === tableNum);
+      return availableIndex !== -1;
+    }
+
+    let reused = false;
+    if (isTableAvailableForReuse(lastTableP1)) {
+      const availableTableIndex = availableTables.findIndex((t) => t.tableNumber === lastTableP1);
+      const table = availableTables.splice(availableTableIndex, 1)[0];
+      targetRow = table.row;
+      tableNumber = table.tableNumber;
+      usedTables.add(tableNumber);
+      reused = true;
+    } else if (isTableAvailableForReuse(lastTableP2)) {
+      const availableTableIndex = availableTables.findIndex((t) => t.tableNumber === lastTableP2);
+      const table = availableTables.splice(availableTableIndex, 1)[0];
+      targetRow = table.row;
+      tableNumber = table.tableNumber;
+      usedTables.add(tableNumber);
+      reused = true;
     }
 
     if (targetRow === null) {

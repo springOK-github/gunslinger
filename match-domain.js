@@ -321,6 +321,9 @@ function matchPlayers() {
       usedTables,
     });
 
+    // 対戦時間を更新する
+    updateAllMatchTimes();
+
     Logger.log(`マッチングが ${actualMatches.length} 件成立しました。「${SHEET_IN_PROGRESS}」シートを確認してください。`);
     return actualMatches.length;
   } catch (e) {

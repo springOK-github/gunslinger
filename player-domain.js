@@ -89,6 +89,146 @@ function registerPlayer() {
 }
 
 /**
+ * プレイヤー名を編集します。
+ * ユーザーにプレイヤーIDの数字部分を尋ね、新しい名前を入力して確定します。
+ */
+function editPlayerName() {
+  const ui = SpreadsheetApp.getUi();
+
+  const playerId = promptPlayerId("プレイヤー名編集", "編集するプレイヤーIDの**数字部分のみ**を入力してください (例: P001なら「1」)。");
+  if (!playerId) return;
+
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
+  if (!playerSheet) {
+    ui.alert("エラー: プレイヤーシートが見つかりません。");
+    return;
+  }
+
+  const { indices, data } = getSheetStructure(playerSheet, SHEET_PLAYERS);
+
+  let found = false;
+  let currentName = playerId;
+  let targetRow = -1;
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (row[indices["プレイヤーID"]] === playerId) {
+      found = true;
+      currentName = row[indices["プレイヤー名"]] || playerId;
+      targetRow = i + 1;
+      break;
+    }
+  }
+
+  if (!found) {
+    ui.alert("エラー", `プレイヤー ${playerId} が見つかりません。`, ui.ButtonSet.OK);
+    return;
+  }
+
+  const response = ui.prompt("新しいプレイヤー名の入力", `現在の名前: ${currentName}\n新しいプレイヤー名を入力してください：`, ui.ButtonSet.OK_CANCEL);
+  if (response.getSelectedButton() !== ui.Button.OK) {
+    ui.alert("処理をキャンセルしました。");
+    return;
+  }
+
+  const newName = response.getResponseText().trim();
+  if (!newName) {
+    ui.alert("エラー", "プレイヤー名は空にできません。", ui.ButtonSet.OK);
+    return;
+  }
+
+  const confirm = ui.alert(
+    "編集の確認",
+    `プレイヤーID: ${playerId}\n現在の名前: ${currentName}\n新しい名前: ${newName}\n\nこの内容で更新しますか？`,
+    ui.ButtonSet.YES_NO
+  );
+  if (confirm !== ui.Button.YES) {
+    ui.alert("処理をキャンセルしました。");
+    return;
+  }
+
+  let lock = null;
+  try {
+    lock = acquireLock("プレイヤー名編集");
+    const freshSheet = ss.getSheetByName(SHEET_PLAYERS);
+    if (!freshSheet) {
+      ui.alert("エラー: プレイヤーシートが見つかりません。");
+      return;
+    }
+    const { indices: freshIdx, data: freshData } = getSheetStructure(freshSheet, SHEET_PLAYERS);
+
+    // targetRow は先に取得した index を使うが、念のため最新の位置を再検索
+    let finalRow = targetRow;
+    if (finalRow === -1) {
+      for (let i = 1; i < freshData.length; i++) {
+        if (freshData[i][freshIdx["プレイヤーID"]] === playerId) {
+          finalRow = i + 1;
+          break;
+        }
+      }
+    }
+
+    if (finalRow === -1) {
+      ui.alert("エラー", `プレイヤー ${playerId} が見つかりません（更新前後で削除された可能性があります）。`, ui.ButtonSet.OK);
+      return;
+    }
+
+    freshSheet.getRange(finalRow, freshIdx["プレイヤー名"] + 1).setValue(newName);
+    // 進行中対戦シートの表示名を更新
+    try {
+      const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
+      if (inProgressSheet) {
+        const { indices: inIdx, data: inData } = getSheetStructure(inProgressSheet, SHEET_IN_PROGRESS);
+        for (let i = 1; i < inData.length; i++) {
+          const row = inData[i];
+          const id1 = row[inIdx["ID1"]];
+          const id2 = row[inIdx["ID2"]];
+          const rowNum = i + 1;
+          if (id1 === playerId) {
+            inProgressSheet.getRange(rowNum, inIdx["プレイヤー1"] + 1).setValue(newName);
+          }
+          if (id2 === playerId) {
+            inProgressSheet.getRange(rowNum, inIdx["プレイヤー2"] + 1).setValue(newName);
+          }
+        }
+      }
+    } catch (e) {
+      Logger.log("editPlayerName: in-progress シート更新でエラー: " + (e && e.toString()));
+    }
+
+    // 対戦履歴の表示名を更新（履歴では勝者は ID1、敗者は ID2 の位置に格納されている想定）
+    try {
+      const historySheet = ss.getSheetByName(SHEET_HISTORY);
+      if (historySheet) {
+        const { indices: histIdx, data: histData } = getSheetStructure(historySheet, SHEET_HISTORY);
+        for (let i = 1; i < histData.length; i++) {
+          const row = histData[i];
+          const hId1 = row[histIdx["ID1"]];
+          const hId2 = row[histIdx["ID2"]];
+          const histRowNum = i + 1;
+          if (hId1 === playerId) {
+            historySheet.getRange(histRowNum, histIdx["勝者名"] + 1).setValue(newName);
+          }
+          if (hId2 === playerId) {
+            historySheet.getRange(histRowNum, histIdx["敗者名"] + 1).setValue(newName);
+          }
+        }
+      }
+    } catch (e) {
+      Logger.log("editPlayerName: history シート更新でエラー: " + (e && e.toString()));
+    }
+
+    ui.alert("更新完了", `プレイヤー ${playerId} の名前を ${currentName} → ${newName} に更新しました。`, ui.ButtonSet.OK);
+  } catch (e) {
+    ui.alert("エラーが発生しました: " + e.toString());
+    Logger.log("editPlayerName エラー: " + e.toString());
+  } finally {
+    releaseLock(lock);
+  }
+}
+
+/**
  * プレイヤーを大会からドロップアウトさせます。
  * 参加状況を「終了」に変更し、進行中の対戦がある場合は無効にします。
  */

@@ -18,6 +18,7 @@ function onOpen() {
     .addItem("🏁 大会終了", "endTournament")
     .addSeparator()
     .addItem("➕ プレイヤーを追加する", "registerPlayer")
+    .addItem("🖊️ プレイヤー名を編集", "editPlayerName")
     .addItem("☕ プレイヤーを休憩させる", "restPlayer")
     .addItem("↩️ 休憩から復帰させる", "returnPlayerFromResting")
     .addItem("❌ プレイヤーをドロップアウトさせる", "dropoutPlayer")

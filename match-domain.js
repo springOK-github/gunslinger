@@ -631,7 +631,7 @@ function deferMatchPlayers() {
       ScriptApp.newTrigger("runDeferredMatchPlayers").timeBased().everyMinutes(1).create();
     }
   } catch (e) {
-    Logger.log("deferMatchPlayers エラー: " + (e && e.toString()));
+    Logger.log("deferMatchPlayers エラー: " + e?.toString());
   }
 }
 
@@ -648,7 +648,7 @@ function runDeferredMatchPlayers() {
   try {
     const triggers = ScriptApp.getProjectTriggers();
     triggers.forEach((t) => {
-      if (t.getHandlerFunction && t.getHandlerFunction() === "runDeferredMatchPlayers") {
+      if (t.getHandlerFunction() === "runDeferredMatchPlayers") {
         ScriptApp.deleteTrigger(t);
       }
     });
@@ -664,6 +664,6 @@ function runDeferredMatchPlayers() {
   try {
     matchPlayers();
   } catch (e) {
-    Logger.log("runDeferredMatchPlayers: matchPlayers 実行エラー: " + (e && e.toString()));
+    Logger.log("runDeferredMatchPlayers: matchPlayers 実行エラー: " + e?.toString());
   }
 }

@@ -533,6 +533,13 @@ function updatePlayerState(options) {
 
     // 4. 結果の記録（必要な場合）
     if (recordResult) {
+      if (currentStatus !== PLAYER_STATUS.IN_PROGRESS || !opponentId || matchRow === -1) {
+        result = {
+          success: false,
+          message: "対戦情報が変化したため、もう一度結果を入力してください。",
+        };
+        return result;
+      }
       const currentTime = new Date();
       const formattedTime = Utilities.formatDate(currentTime, "Asia/Tokyo", "yyyy/MM/dd HH:mm:ss");
       const historySheet = ss.getSheetByName(SHEET_HISTORY);

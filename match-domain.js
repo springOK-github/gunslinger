@@ -626,7 +626,7 @@ function deferMatchPlayers() {
     props.setProperty("PENDING_MATCH_PLAYERS", "1");
 
     const triggers = ScriptApp.getProjectTriggers();
-    const alreadyScheduled = triggers.some((t) => t.getHandlerFunction && t.getHandlerFunction() === "runDeferredMatchPlayers");
+    const alreadyScheduled = triggers.some((t) => t.getHandlerFunction() === "runDeferredMatchPlayers");
     if (!alreadyScheduled) {
       ScriptApp.newTrigger("runDeferredMatchPlayers").timeBased().everyMinutes(1).create();
     }
@@ -653,7 +653,7 @@ function runDeferredMatchPlayers() {
       }
     });
   } catch (e) {
-    Logger.log("runDeferredMatchPlayers: トリガー削除エラー: " + (e && e.toString()));
+    Logger.log("runDeferredMatchPlayers: トリガー削除エラー: " + e?.toString());
   }
 
   if (!pending) {

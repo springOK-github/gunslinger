@@ -82,7 +82,7 @@ function endTournament() {
     try {
       PropertiesService.getDocumentProperties().setProperty("MAINTENANCE_MODE", "1");
     } catch (e) {
-      Logger.log("MAINTENANCE_MODE の設定に失敗: " + e && e.toString());
+      Logger.log("MAINTENANCE_MODE の設定に失敗: " + e?.toString());
     }
 
     // 対戦時間計測タイマーの停止
@@ -142,17 +142,17 @@ function endTournament() {
     try {
       ensureAndInitSheet(ss, SHEET_HISTORY);
     } catch (e) {
-      Logger.log("endTournament: シート初期化に失敗しました: " + (e && e.toString()));
+      Logger.log("endTournament: シート初期化に失敗しました: " + e?.toString());
     }
   } catch (e) {
     ui.alert("エラー", `大会終了に失敗しました: ${e.message}`, ui.ButtonSet.OK);
-    Logger.log("endTournament エラー: " + e.toString());
+    Logger.log("endTournament エラー: " + e?.toString());
   } finally {
     // メンテナンスモードを解除
     try {
       PropertiesService.getDocumentProperties().deleteProperty("MAINTENANCE_MODE");
     } catch (e) {
-      Logger.log("MAINTENANCE_MODE の解除に失敗: " + e && e.toString());
+      Logger.log("MAINTENANCE_MODE の解除に失敗: " + e?.toString());
     }
 
     releaseLock(lock);
@@ -177,7 +177,7 @@ function endAllActiveMatches() {
       ownedMaintenanceFlag = true;
     }
   } catch (e) {
-    Logger.log("endAllActiveMatches: MAINTENANCE_MODE 操作に失敗: " + (e && e.toString()));
+    Logger.log("endAllActiveMatches: MAINTENANCE_MODE 操作に失敗: " + e?.toString());
   }
 
   const historySheet = ss.getSheetByName(SHEET_HISTORY);
@@ -250,7 +250,7 @@ function endAllActiveMatches() {
         isTargetWinner: false,
       });
     } catch (e) {
-      Logger.log("updatePlayerState error for %s: %s", id1, e && e.toString());
+      Logger.log("updatePlayerState error for %s: %s", id1, e?.toString());
     }
     try {
       updatePlayerState({
@@ -261,7 +261,7 @@ function endAllActiveMatches() {
         isTargetWinner: false,
       });
     } catch (e) {
-      Logger.log("updatePlayerState error for %s: %s", id2, e && e.toString());
+      Logger.log("updatePlayerState error for %s: %s", id2, e?.toString());
     }
   }
 
@@ -291,7 +291,7 @@ function endAllActiveMatches() {
       props.deleteProperty("MAINTENANCE_MODE");
     }
   } catch (e) {
-    Logger.log("endAllActiveMatches: MAINTENANCE_MODE の解除に失敗: " + (e && e.toString()));
+    Logger.log("endAllActiveMatches: MAINTENANCE_MODE の解除に失敗: " + e?.toString());
   }
 
   return activeRows.length;
@@ -542,7 +542,7 @@ function releaseLock(lock) {
     try {
       lock.releaseLock();
     } catch (e) {
-      Logger.log("ロックの解放に失敗: " + e.toString());
+      Logger.log("ロックの解放に失敗: " + e?.toString());
     }
   }
 }

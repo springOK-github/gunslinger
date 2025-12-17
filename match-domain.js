@@ -409,8 +409,8 @@ function promptAndRecordResult() {
     // recordResult内でロックを取得するため、ここではロック不要
     recordResult(formattedWinnerId);
   } catch (e) {
-    ui.alert("エラーが発生しました: " + e.toString());
-    Logger.log("promptAndRecordResult エラー: " + e.toString());
+    ui.alert("エラーが発生しました: " + e?.toString());
+    Logger.log("promptAndRecordResult エラー: " + e?.toString());
   }
 }
 
@@ -562,8 +562,8 @@ function correctMatchResult() {
 
     Logger.log(`対戦結果修正完了: ${matchId}, 新勝者: ${currentLoserId}, 新敗者: ${currentWinnerId}`);
   } catch (e) {
-    ui.alert("エラーが発生しました: " + e.toString());
-    Logger.log("correctMatchResult エラー: " + e.toString());
+    ui.alert("エラーが発生しました: " + e?.toString());
+    Logger.log("correctMatchResult エラー: " + e?.toString());
   } finally {
     releaseLock(lock);
   }
@@ -631,7 +631,7 @@ function deferMatchPlayers() {
       ScriptApp.newTrigger("runDeferredMatchPlayers").timeBased().everyMinutes(1).create();
     }
   } catch (e) {
-    Logger.log("deferMatchPlayers エラー: " + (e && e.toString()));
+    Logger.log("deferMatchPlayers エラー: " + e?.toString());
   }
 }
 
@@ -653,7 +653,7 @@ function runDeferredMatchPlayers() {
       }
     });
   } catch (e) {
-    Logger.log("runDeferredMatchPlayers: トリガー削除エラー: " + (e && e.toString()));
+    Logger.log("runDeferredMatchPlayers: トリガー削除エラー: " + e?.toString());
   }
 
   if (!pending) {
@@ -664,6 +664,6 @@ function runDeferredMatchPlayers() {
   try {
     matchPlayers();
   } catch (e) {
-    Logger.log("runDeferredMatchPlayers: matchPlayers 実行エラー: " + (e && e.toString()));
+    Logger.log("runDeferredMatchPlayers: matchPlayers 実行エラー: " + e?.toString());
   }
 }

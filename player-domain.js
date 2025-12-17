@@ -81,8 +81,8 @@ function registerPlayer() {
       Logger.log(`プレイヤー登録後、待機プレイヤーが ${waitingPlayersCount} 人です。自動マッチングはスキップされました。`);
     }
   } catch (e) {
-    ui.alert("エラーが発生しました: " + e.toString());
-    Logger.log("registerPlayer エラー: " + e.toString());
+    ui.alert("エラーが発生しました: " + e?.toString());
+    Logger.log("registerPlayer エラー: " + e?.toString());
   } finally {
     releaseLock(lock);
   }
@@ -194,7 +194,7 @@ function editPlayerName() {
         }
       }
     } catch (e) {
-      Logger.log("editPlayerName: in-progress シート更新でエラー: " + (e && e.toString()));
+      Logger.log("editPlayerName: in-progress シート更新でエラー: " + e?.toString());
     }
 
     // 対戦履歴の表示名を更新（履歴では勝者は ID1、敗者は ID2 の位置に格納されている想定）
@@ -216,13 +216,13 @@ function editPlayerName() {
         }
       }
     } catch (e) {
-      Logger.log("editPlayerName: history シート更新でエラー: " + (e && e.toString()));
+      Logger.log("editPlayerName: history シート更新でエラー: " + e?.toString());
     }
 
     ui.alert("更新完了", `プレイヤー ${playerId} の名前を ${currentName} → ${newName} に更新しました。`, ui.ButtonSet.OK);
   } catch (e) {
-    ui.alert("エラーが発生しました: " + e.toString());
-    Logger.log("editPlayerName エラー: " + e.toString());
+    ui.alert("エラーが発生しました: " + e?.toString());
+    Logger.log("editPlayerName エラー: " + e?.toString());
   } finally {
     releaseLock(lock);
   }
@@ -335,8 +335,8 @@ function returnPlayerFromResting() {
 
     Logger.log(`プレイヤー ${playerId} を休憩から復帰させました。`);
   } catch (e) {
-    ui.alert("エラーが発生しました: " + e.toString());
-    Logger.log("returnPlayerFromResting エラー: " + e.toString());
+    ui.alert("エラーが発生しました: " + e?.toString());
+    Logger.log("returnPlayerFromResting エラー: " + e?.toString());
   } finally {
     releaseLock(lock);
   }
@@ -602,7 +602,7 @@ function updatePlayerState(options) {
     Logger.log("handleMatchStateChange エラー: " + e.message);
     result = {
       success: false,
-      message: "エラーが発生しました: " + e.toString(),
+      message: "エラーが発生しました: " + e?.toString(),
     };
   } finally {
     releaseLock(lock);

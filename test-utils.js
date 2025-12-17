@@ -50,7 +50,7 @@ function registerTestPlayers() {
       matchPlayers(); // 登録都度マッチングさせる
     }
   } catch (e) {
-    Logger.log("registerTestPlayers エラー: " + e.toString());
+    Logger.log("registerTestPlayers エラー: " + e?.toString());
   } finally {
     releaseLock(lock);
   }

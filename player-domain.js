@@ -440,19 +440,20 @@ function updatePlayerState(options) {
   const { targetPlayerId, newStatus, opponentNewStatus, recordResult = false, isTargetWinner = false } = options;
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let matchLock = null;
-  let stateLock = null;
+  let lock = null;
+  let result = { success: false, message: "未処理" };
+  let shouldRunMatching = false;
 
   try {
-    // 両方のロックを取得（順序を固定して デッドロック防止）
-    stateLock = acquireLock("プレイヤー状態変更");
-    matchLock = acquireLock("対戦結果の記録");
+    // 単一ロックで状態変更と結果記録を保護
+    lock = acquireLock("プレイヤー状態変更");
 
     // 1. プレイヤーの現在の状態を確認
     const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
     if (!playerSheet) {
       Logger.log("エラー: プレイヤーシートが見つかりません。");
-      return { success: false, message: "プレイヤーシートが見つかりません。" };
+      result = { success: false, message: "プレイヤーシートが見つかりません。" };
+      return result;
     }
     const { indices: playerIndices, data: playerData } = getSheetStructure(playerSheet, SHEET_PLAYERS);
 
@@ -471,11 +472,13 @@ function updatePlayerState(options) {
     }
 
     if (!targetFound) {
-      return { success: false, message: `プレイヤー ${targetPlayerId} が見つかりません。` };
+      result = { success: false, message: `プレイヤー ${targetPlayerId} が見つかりません。` };
+      return result;
     }
 
     if (currentStatus === PLAYER_STATUS.DROPPED) {
-      return { success: false, message: `プレイヤー ${targetPlayerId} はすでにドロップアウトしています。` };
+      result = { success: false, message: `プレイヤー ${targetPlayerId} はすでにドロップアウトしています。` };
+      return result;
     }
 
     // 3. 対戦中の場合のみ、対戦相手の処理
@@ -486,7 +489,8 @@ function updatePlayerState(options) {
       const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
       if (!inProgressSheet) {
         Logger.log("エラー: 対戦中シートが見つかりません。");
-        return { success: false, message: "対戦中シートが見つかりません。" };
+        result = { success: false, message: "対戦中シートが見つかりません。" };
+        return result;
       }
       const { indices: matchIndices, data: matchData } = getSheetStructure(inProgressSheet, SHEET_IN_PROGRESS);
 
@@ -507,7 +511,8 @@ function updatePlayerState(options) {
       }
 
       if (!opponentId) {
-        return { success: false, message: `データ不整合: 対戦中のはずのプレイヤーID ${targetPlayerId} の対戦相手が見つかりません。` };
+        result = { success: false, message: `データ不整合: 対戦中のはずのプレイヤーID ${targetPlayerId} の対戦相手が見つかりません。` };
+        return result;
       }
 
       // 対戦相手の状態確認
@@ -521,7 +526,8 @@ function updatePlayerState(options) {
       }
 
       if (opponentDropped && opponentNewStatus !== PLAYER_STATUS.DROPPED) {
-        return { success: false, message: `対戦相手はすでにドロップアウトしています。` };
+        result = { success: false, message: `対戦相手はすでにドロップアウトしています。` };
+        return result;
       }
     }
 
@@ -532,7 +538,8 @@ function updatePlayerState(options) {
       const historySheet = ss.getSheetByName(SHEET_HISTORY);
       if (!historySheet) {
         Logger.log("エラー: 履歴シートが見つかりません。");
-        return { success: false, message: "履歴シートが見つかりません。" };
+        result = { success: false, message: "履歴シートが見つかりません。" };
+        return result;
       }
       getSheetStructure(historySheet, SHEET_HISTORY);
       const newId = "T" + Utilities.formatString("%04d", historySheet.getLastRow());
@@ -546,7 +553,8 @@ function updatePlayerState(options) {
       const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
       if (!inProgressSheet) {
         Logger.log("エラー: 対戦中シートが見つかりません。");
-        return { success: false, message: "対戦中シートが見つかりません。" };
+        result = { success: false, message: "対戦中シートが見つかりません。" };
+        return result;
       }
       const { indices: matchIndices } = getSheetStructure(inProgressSheet, SHEET_IN_PROGRESS);
       const matchTableNumber = inProgressSheet.getRange(matchRow, matchIndices["卓番号"] + 1).getValue();
@@ -564,7 +572,8 @@ function updatePlayerState(options) {
       const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
       if (!inProgressSheet) {
         Logger.log("エラー: 対戦中シートが見つかりません。");
-        return { success: false, message: "対戦中シートが見つかりません。" };
+        result = { success: false, message: "対戦中シートが見つかりません。" };
+        return result;
       }
       inProgressSheet.getRange(matchRow, 2, 1, 6).clearContent(); // ID1から対戦時間までをクリア
     }
@@ -582,23 +591,30 @@ function updatePlayerState(options) {
 
     // 7. 必要に応じて次のマッチング
     const waitingPlayersCount = getWaitingPlayers().length;
-    if (waitingPlayersCount >= 2) {
-      matchPlayers();
-    }
+    shouldRunMatching = waitingPlayersCount >= 2;
 
-    return {
+    result = {
       success: true,
       message: "状態変更が完了しました。",
       opponentId,
     };
   } catch (e) {
     Logger.log("handleMatchStateChange エラー: " + e.message);
-    return {
+    result = {
       success: false,
       message: "エラーが発生しました: " + e.toString(),
     };
   } finally {
-    releaseLock(matchLock);
-    releaseLock(stateLock);
+    releaseLock(lock);
   }
+
+  if (shouldRunMatching) {
+    try {
+      matchPlayers();
+    } catch (e) {
+      Logger.log("handleMatchStateChange: matchPlayers 実行エラー: " + e.toString());
+    }
+  }
+
+  return result;
 }

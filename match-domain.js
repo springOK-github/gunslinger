@@ -611,3 +611,59 @@ function updateAllMatchTimes() {
     releaseLock(matchLock);
   }
 }
+
+// =========================================
+// マッチング実行のデファード呼び出し
+// =========================================
+
+/**
+ * matchPlayers を非同期に一度だけ実行するためのキューイング。
+ * 同一時点で複数回呼ばれても、トリガーは1つだけ作成する。
+ */
+function deferMatchPlayers() {
+  try {
+    const props = PropertiesService.getDocumentProperties();
+    props.setProperty("PENDING_MATCH_PLAYERS", "1");
+
+    const triggers = ScriptApp.getProjectTriggers();
+    const alreadyScheduled = triggers.some((t) => t.getHandlerFunction() === "runDeferredMatchPlayers");
+    if (!alreadyScheduled) {
+      ScriptApp.newTrigger("runDeferredMatchPlayers").timeBased().everyMinutes(1).create();
+    }
+  } catch (e) {
+    Logger.log("deferMatchPlayers エラー: " + (e && e.toString()));
+  }
+}
+
+/**
+ * deferMatchPlayers でキューされたマッチングを実行する。
+ * トリガー自体は実行後に削除しておく。
+ */
+function runDeferredMatchPlayers() {
+  const props = PropertiesService.getDocumentProperties();
+  const pending = props.getProperty("PENDING_MATCH_PLAYERS");
+  props.deleteProperty("PENDING_MATCH_PLAYERS");
+
+  // トリガーのクリーンアップ（複数存在する場合も削除）
+  try {
+    const triggers = ScriptApp.getProjectTriggers();
+    triggers.forEach((t) => {
+      if (t.getHandlerFunction && t.getHandlerFunction() === "runDeferredMatchPlayers") {
+        ScriptApp.deleteTrigger(t);
+      }
+    });
+  } catch (e) {
+    Logger.log("runDeferredMatchPlayers: トリガー削除エラー: " + e?.toString());
+  }
+
+  if (!pending) {
+    Logger.log("runDeferredMatchPlayers: 保留中のマッチングはありません。");
+    return;
+  }
+
+  try {
+    matchPlayers();
+  } catch (e) {
+    Logger.log("runDeferredMatchPlayers: matchPlayers 実行エラー: " + (e && e.toString()));
+  }
+}

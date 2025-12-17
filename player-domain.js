@@ -76,7 +76,7 @@ function registerPlayer() {
     const waitingPlayersCount = getWaitingPlayers().length;
     if (waitingPlayersCount >= 2) {
       Logger.log(`プレイヤー登録後、待機プレイヤーが ${waitingPlayersCount} 人いるため、自動でマッチングを開始します。`);
-      matchPlayers();
+      deferMatchPlayers();
     } else {
       Logger.log(`プレイヤー登録後、待機プレイヤーが ${waitingPlayersCount} 人です。自動マッチングはスキップされました。`);
     }
@@ -330,7 +330,7 @@ function returnPlayerFromResting() {
     const waitingPlayersCount = getWaitingPlayers().length;
     if (waitingPlayersCount >= 2) {
       Logger.log(`復帰後、待機プレイヤーが ${waitingPlayersCount} 人いるため、自動でマッチングを開始します。`);
-      matchPlayers();
+      deferMatchPlayers();
     }
 
     Logger.log(`プレイヤー ${playerId} を休憩から復帰させました。`);
@@ -609,11 +609,7 @@ function updatePlayerState(options) {
   }
 
   if (shouldRunMatching) {
-    try {
-      matchPlayers();
-    } catch (e) {
-      Logger.log("handleMatchStateChange: matchPlayers 実行エラー: " + e.toString());
-    }
+    deferMatchPlayers();
   }
 
   return result;

@@ -76,7 +76,7 @@ function registerPlayer() {
     const waitingPlayersCount = getWaitingPlayers().length;
     if (waitingPlayersCount >= 2) {
       Logger.log(`プレイヤー登録後、待機プレイヤーが ${waitingPlayersCount} 人いるため、自動でマッチングを開始します。`);
-      matchPlayers();
+      deferMatchPlayers();
     } else {
       Logger.log(`プレイヤー登録後、待機プレイヤーが ${waitingPlayersCount} 人です。自動マッチングはスキップされました。`);
     }
@@ -330,7 +330,7 @@ function returnPlayerFromResting() {
     const waitingPlayersCount = getWaitingPlayers().length;
     if (waitingPlayersCount >= 2) {
       Logger.log(`復帰後、待機プレイヤーが ${waitingPlayersCount} 人いるため、自動でマッチングを開始します。`);
-      matchPlayers();
+      deferMatchPlayers();
     }
 
     Logger.log(`プレイヤー ${playerId} を休憩から復帰させました。`);
@@ -533,13 +533,6 @@ function updatePlayerState(options) {
 
     // 4. 結果の記録（必要な場合）
     if (recordResult) {
-      if (currentStatus !== PLAYER_STATUS.IN_PROGRESS || !opponentId || matchRow === -1) {
-        result = {
-          success: false,
-          message: "対戦情報が変化したため、もう一度結果を入力してください。",
-        };
-        return result;
-      }
       const currentTime = new Date();
       const formattedTime = Utilities.formatDate(currentTime, "Asia/Tokyo", "yyyy/MM/dd HH:mm:ss");
       const historySheet = ss.getSheetByName(SHEET_HISTORY);
@@ -616,11 +609,7 @@ function updatePlayerState(options) {
   }
 
   if (shouldRunMatching) {
-    try {
-      matchPlayers();
-    } catch (e) {
-      Logger.log("handleMatchStateChange: matchPlayers 実行エラー: " + e.toString());
-    }
+    deferMatchPlayers();
   }
 
   return result;

@@ -648,7 +648,7 @@ function runDeferredMatchPlayers() {
   try {
     const triggers = ScriptApp.getProjectTriggers();
     triggers.forEach((t) => {
-      if (t.getHandlerFunction && t.getHandlerFunction() === "runDeferredMatchPlayers") {
+      if (t.getHandlerFunction() === "runDeferredMatchPlayers") {
         ScriptApp.deleteTrigger(t);
       }
     });

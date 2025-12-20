@@ -363,18 +363,8 @@ function getWaitingPlayers() {
     const { indices, data } = getSheetStructure(playerSheet, SHEET_PLAYERS);
     if (data.length <= 1) return [];
 
-    const waiting = data.slice(1).filter((row) => row[indices["参加状況"]] === PLAYER_STATUS.WAITING);
-
-    waiting.sort((a, b) => {
-      const winsDiff = b[indices["勝数"]] - a[indices["勝数"]];
-      if (winsDiff !== 0) return winsDiff;
-
-      const dateA = a[indices["最終対戦時刻"]] instanceof Date ? a[indices["最終対戦時刻"]].getTime() : 0;
-      const dateB = b[indices["最終対戦時刻"]] instanceof Date ? b[indices["最終対戦時刻"]].getTime() : 0;
-      return dateA - dateB; // 古い時刻が先（登録順・先着順）
-    });
-
-    return waiting;
+    // 並び順はマッチング側の共通ロジックに委譲（勝数降順→最終対戦時刻昇順）
+    return getAndSortWaitingPlayers(data, indices);
   } catch (e) {
     Logger.log("getWaitingPlayers エラー: " + e.message);
     return [];

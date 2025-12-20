@@ -370,10 +370,12 @@ function matchPlayers() {
       return 0;
     }
 
+    const actualMatches = plan.actualMatches || [];
+
     applyMatchPlan(plan, ctx);
 
-    Logger.log(`マッチングが ${plan.actualMatches.length} 件成立しました。「${SHEET_IN_PROGRESS}」シートを確認してください。`);
-    return plan.actualMatches.length;
+    Logger.log(`マッチングが ${actualMatches.length} 件成立しました。「${SHEET_IN_PROGRESS}」シートを確認してください。`);
+    return actualMatches.length;
   } catch (e) {
     Logger.log("matchPlayers エラー: " + e.message);
     return 0;
@@ -396,7 +398,7 @@ function promptAndRecordResult() {
 
   const lookup = findOpponentIdFromInProgress(winnerId);
   if (!lookup.ok) {
-    ui.alert("エラー", lookup.message, ui.ButtonSet.OK);
+    ui.alert("エラー", lookup.message || "", ui.ButtonSet.OK);
     return;
   }
 
@@ -465,11 +467,27 @@ function correctMatchResult() {
 
   const found = findMatchById(historySheet, matchId);
   if (!found.ok) {
-    ui.alert("エラー", found.message, ui.ButtonSet.OK);
+    ui.alert("エラー", found.message || "", ui.ButtonSet.OK);
     return;
   }
 
   const { matchRow, matchDataRow, historyIndices } = found;
+
+  const id1Col = historyIndices["ID1"];
+  const winnerNameCol = historyIndices["勝者名"];
+  const id2Col = historyIndices["ID2"];
+  const loserNameCol = historyIndices["敗者名"];
+
+  if (typeof id1Col !== "number" || typeof winnerNameCol !== "number" || typeof id2Col !== "number" || typeof loserNameCol !== "number") {
+    ui.alert("エラー", "履歴シートのヘッダーが不足しています。", ui.ButtonSet.OK);
+    return;
+  }
+
+  const targetRow = Number(matchRow);
+  const colId1 = Number(id1Col);
+  const colWinnerName = Number(winnerNameCol);
+  const colId2 = Number(id2Col);
+  const colLoserName = Number(loserNameCol);
 
   const currentWinnerId = matchDataRow[historyIndices["ID1"]];
   const currentWinnerName = matchDataRow[historyIndices["勝者名"]];
@@ -490,10 +508,10 @@ function correctMatchResult() {
     lock = acquireLock("対戦結果の修正");
 
     // 5. 対戦履歴を更新（勝者と敗者を入れ替え）
-    historySheet.getRange(matchRow, historyIndices["ID1"] + 1).setValue(currentLoserId);
-    historySheet.getRange(matchRow, historyIndices["勝者名"] + 1).setValue(currentLoserName);
-    historySheet.getRange(matchRow, historyIndices["ID2"] + 1).setValue(currentWinnerId);
-    historySheet.getRange(matchRow, historyIndices["敗者名"] + 1).setValue(currentWinnerName);
+    historySheet.getRange(targetRow, colId1 + 1).setValue(currentLoserId);
+    historySheet.getRange(targetRow, colWinnerName + 1).setValue(currentLoserName);
+    historySheet.getRange(targetRow, colId2 + 1).setValue(currentWinnerId);
+    historySheet.getRange(targetRow, colLoserName + 1).setValue(currentWinnerName);
 
     // 6. プレイヤーの統計を修正
     const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
@@ -678,7 +696,7 @@ function updateAllMatchTimes() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
   let updatedCount = 0;
-  const currentTime = new Date();
+  const now = new Date();
   let matchLock = null;
 
   try {
@@ -689,19 +707,36 @@ function updateAllMatchTimes() {
       Logger.log(`エラー: シート「${SHEET_IN_PROGRESS}」が見つかりません。`);
       return;
     }
+
     const { indices, data } = getSheetStructure(inProgressSheet, SHEET_IN_PROGRESS);
+    if (data.length <= 1) {
+      Logger.log("対戦時間更新: 対戦中の行がありません。");
+      return;
+    }
+
+    const startCol = indices["対戦開始時刻"];
+    const elapsedCol = indices["経過時間"];
+
+    const elapsedValues = [];
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
-      const startTime = new Date(row[indices["対戦開始時刻"]]);
-      // 対戦開始時刻が存在する場合のみ更新
-      if (startTime.toString() !== "Invalid Date") {
-        const elapsedMs = currentTime.getTime() - startTime.getTime();
-        const elapsedDate = new Date(elapsedMs);
-        const formattedElapsed = Utilities.formatDate(elapsedDate, "UTC", "HH:mm:ss");
-        inProgressSheet.getRange(i + 1, indices["経過時間"] + 1).setValue(formattedElapsed);
-        updatedCount++;
+      const startTime = new Date(row[startCol]);
+      if (startTime.toString() === "Invalid Date") {
+        elapsedValues.push([""]);
+        continue;
       }
+
+      const elapsedMs = now.getTime() - startTime.getTime();
+      // 負の値は0扱い（時刻不整合の防御）
+      const safeMs = Math.max(0, elapsedMs);
+      const formattedElapsed = formatElapsedMs(safeMs);
+      elapsedValues.push([formattedElapsed]);
+      updatedCount++;
     }
+
+    // まとめて書き込み
+    inProgressSheet.getRange(2, elapsedCol + 1, elapsedValues.length, 1).setValues(elapsedValues);
+
     Logger.log(`対戦時間が ${updatedCount} 卓分更新されました。`);
   } catch (e) {
     Logger.log("updateAllMatchTimes エラー: " + e?.toString());

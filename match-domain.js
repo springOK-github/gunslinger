@@ -391,73 +391,23 @@ function matchPlayers() {
  */
 function promptAndRecordResult() {
   const ui = SpreadsheetApp.getUi();
+  const winnerId = promptWinnerId();
+  if (!winnerId) return;
 
-  // 最初にユーザー入力を受け付け
-  const winnerResponse = ui.prompt("対戦結果の記録", `勝者のプレイヤーIDの**数字部分のみ**を入力してください (例: P001なら「1」)。`, ui.ButtonSet.OK_CANCEL);
-
-  if (winnerResponse.getSelectedButton() !== ui.Button.OK) {
-    ui.alert("処理をキャンセルしました。");
+  const lookup = findOpponentIdFromInProgress(winnerId);
+  if (!lookup.ok) {
+    ui.alert("エラー", lookup.message, ui.ButtonSet.OK);
     return;
   }
 
-  const rawId = winnerResponse.getResponseText().trim();
-
-  if (!/^\d+$/.test(rawId)) {
-    ui.alert("エラー: IDは数字のみで入力してください。");
-    return;
-  }
-
-  const formattedWinnerId = PLAYER_ID_PREFIX + Utilities.formatString(`%0${ID_DIGITS}d`, parseInt(rawId, 10));
-
-  // この時点でロックは取得しない
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
-  if (!inProgressSheet) {
-    ui.alert("エラー: 対戦中シートが見つかりません。");
-    return;
-  }
-  const { indices, data } = getSheetStructure(inProgressSheet, SHEET_IN_PROGRESS);
-  let loserId = null;
-
-  // 対戦相手の確認（ロック不要）
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    const p1 = row[indices["ID1"]];
-    const p2 = row[indices["ID2"]];
-
-    if (p1 === formattedWinnerId) {
-      loserId = p2;
-      break;
-    } else if (p2 === formattedWinnerId) {
-      loserId = p1;
-      break;
-    }
-  }
-
-  if (loserId === null) {
-    ui.alert(
-      `エラー: 勝者ID (${formattedWinnerId}) は「${SHEET_IN_PROGRESS}」シートに見つかりませんでした。\n入力IDが間違っているか、対戦が記録されていません。`
-    );
-    return;
-  }
-
-  // ユーザーに確認
-  const confirmResponse = ui.alert(
-    "対戦結果の確認",
-    `以下の内容で記録してよろしいですか？\n\n` + `勝者: ${getPlayerName(formattedWinnerId)}\n` + `敗者: ${getPlayerName(loserId)}`,
-    ui.ButtonSet.YES_NO
-  );
-
-  if (confirmResponse !== ui.Button.YES) {
-    ui.alert("処理をキャンセルしました。");
-    return;
-  }
+  const confirmed = confirmResultDialog(winnerId, lookup.opponentId);
+  if (!confirmed) return;
 
   try {
     // recordResult内でロックを取得するため、ここではロック不要
-    recordResult(formattedWinnerId);
+    recordResult(winnerId);
   } catch (e) {
-    ui.alert("エラーが発生しました: " + e.toString());
+    SpreadsheetApp.getUi().alert("エラーが発生しました: " + e.toString());
     Logger.log("promptAndRecordResult エラー: " + e.toString());
   }
 }
@@ -504,71 +454,36 @@ function correctMatchResult() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let lock = null;
 
-  // 1. 対戦IDの入力（ロック不要）
-  const response = ui.prompt("対戦結果の修正", "修正する対戦IDの**数字部分のみ**を入力してください (例: T0001なら「1」)。", ui.ButtonSet.OK_CANCEL);
+  const matchId = promptMatchId();
+  if (!matchId) return;
 
-  if (response.getSelectedButton() !== ui.Button.OK) {
-    ui.alert("処理をキャンセルしました。");
-    return;
-  }
-
-  const rawId = response.getResponseText().trim();
-  if (!/^\d+$/.test(rawId)) {
-    ui.alert("エラー", "IDは数字のみで入力してください。", ui.ButtonSet.OK);
-    return;
-  }
-
-  const matchId = "T" + Utilities.formatString("%04d", parseInt(rawId, 10));
-
-  // 2. 対戦履歴から該当の対戦を検索（ロック不要の読み取り）
   const historySheet = ss.getSheetByName(SHEET_HISTORY);
   if (!historySheet) {
     ui.alert("エラー", `シート「${SHEET_HISTORY}」が見つかりません。`, ui.ButtonSet.OK);
     return;
   }
-  const { indices: historyIndices, data: historyData } = getSheetStructure(historySheet, SHEET_HISTORY);
 
-  let matchRow = -1;
-  let matchDataRow = null;
-
-  for (let i = 1; i < historyData.length; i++) {
-    const row = historyData[i];
-    if (row[historyIndices["対戦ID"]] === matchId) {
-      matchRow = i + 1;
-      matchDataRow = row;
-      break;
-    }
-  }
-
-  if (matchRow === -1) {
-    ui.alert("エラー", `対戦ID ${matchId} が見つかりません。`, ui.ButtonSet.OK);
+  const found = findMatchById(historySheet, matchId);
+  if (!found.ok) {
+    ui.alert("エラー", found.message, ui.ButtonSet.OK);
     return;
   }
 
-  // 3. 現在の勝者と敗者を取得
+  const { matchRow, matchDataRow, historyIndices } = found;
+
   const currentWinnerId = matchDataRow[historyIndices["ID1"]];
   const currentWinnerName = matchDataRow[historyIndices["勝者名"]];
   const currentLoserId = matchDataRow[historyIndices["ID2"]];
   const currentLoserName = matchDataRow[historyIndices["敗者名"]];
 
-  // 4. 修正の確認（ロック不要）
-  const confirmResponse = ui.alert(
-    "勝敗修正の確認",
-    `対戦ID: ${matchId}\n\n` +
-      `【現在】\n` +
-      `勝者: ${currentWinnerName} (${currentWinnerId})\n` +
-      `敗者: ${currentLoserName} (${currentLoserId})\n\n` +
-      `【修正後】\n` +
-      `勝者: ${currentLoserName} (${currentLoserId})\n` +
-      `敗者: ${currentWinnerName} (${currentWinnerId})\n\n` +
-      "勝敗を入れ替えますか？",
-    ui.ButtonSet.YES_NO
-  );
+  const confirmed = confirmCorrectMatch(matchId, {
+    currentWinnerId,
+    currentWinnerName,
+    currentLoserId,
+    currentLoserName,
+  });
 
-  if (confirmResponse !== ui.Button.YES) {
-    ui.alert("処理をキャンセルしました。");
-    return;
-  }
+  if (!confirmed) return;
 
   try {
     // 確認後にロックを取得して更新処理
@@ -615,6 +530,141 @@ function correctMatchResult() {
   } finally {
     releaseLock(lock);
   }
+}
+
+/**
+ * 勝者IDの入力とバリデーションを行い、整形済みIDを返す。
+ */
+function promptWinnerId() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.prompt("対戦結果の記録", `勝者のプレイヤーIDの**数字部分のみ**を入力してください (例: P001なら「1」)。`, ui.ButtonSet.OK_CANCEL);
+
+  if (response.getSelectedButton() !== ui.Button.OK) {
+    ui.alert("処理をキャンセルしました。");
+    return null;
+  }
+
+  const rawId = response.getResponseText().trim();
+  if (!/^\d+$/.test(rawId)) {
+    ui.alert("エラー: IDは数字のみで入力してください。");
+    return null;
+  }
+
+  return PLAYER_ID_PREFIX + Utilities.formatString(`%0${ID_DIGITS}d`, parseInt(rawId, 10));
+}
+
+/**
+ * 対戦中シートから勝者IDに対応する相手IDを取得する。
+ */
+function findOpponentIdFromInProgress(winnerId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
+  if (!inProgressSheet) {
+    return { ok: false, message: `シート「${SHEET_IN_PROGRESS}」が見つかりません。` };
+  }
+
+  const { indices, data } = getSheetStructure(inProgressSheet, SHEET_IN_PROGRESS);
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const p1 = row[indices["ID1"]];
+    const p2 = row[indices["ID2"]];
+
+    if (p1 === winnerId) {
+      return { ok: true, opponentId: p2 };
+    } else if (p2 === winnerId) {
+      return { ok: true, opponentId: p1 };
+    }
+  }
+
+  return {
+    ok: false,
+    message: `勝者ID (${winnerId}) は「${SHEET_IN_PROGRESS}」シートに見つかりませんでした。\n入力IDが間違っているか、対戦が記録されていません。`,
+  };
+}
+
+/**
+ * 対戦結果記録の確認ダイアログ。
+ */
+function confirmResultDialog(winnerId, loserId) {
+  const ui = SpreadsheetApp.getUi();
+  const confirmResponse = ui.alert(
+    "対戦結果の確認",
+    `以下の内容で記録してよろしいですか？\n\n` + `勝者: ${getPlayerName(winnerId)}\n` + `敗者: ${getPlayerName(loserId)}`,
+    ui.ButtonSet.YES_NO
+  );
+
+  if (confirmResponse !== ui.Button.YES) {
+    ui.alert("処理をキャンセルしました。");
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * 対戦IDの入力とバリデーションを行う。
+ */
+function promptMatchId() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.prompt("対戦結果の修正", "修正する対戦IDの**数字部分のみ**を入力してください (例: T0001なら「1」)。", ui.ButtonSet.OK_CANCEL);
+
+  if (response.getSelectedButton() !== ui.Button.OK) {
+    ui.alert("処理をキャンセルしました。");
+    return null;
+  }
+
+  const rawId = response.getResponseText().trim();
+  if (!/^\d+$/.test(rawId)) {
+    ui.alert("エラー", "IDは数字のみで入力してください。", ui.ButtonSet.OK);
+    return null;
+  }
+
+  return "T" + Utilities.formatString("%04d", parseInt(rawId, 10));
+}
+
+/**
+ * 対戦履歴シートから対戦IDで行を検索する。
+ */
+function findMatchById(historySheet, matchId) {
+  const { indices: historyIndices, data: historyData } = getSheetStructure(historySheet, SHEET_HISTORY);
+
+  for (let i = 1; i < historyData.length; i++) {
+    const row = historyData[i];
+    if (row[historyIndices["対戦ID"]] === matchId) {
+      return { ok: true, matchRow: i + 1, matchDataRow: row, historyIndices };
+    }
+  }
+
+  return { ok: false, message: `対戦ID ${matchId} が見つかりません。` };
+}
+
+/**
+ * 勝敗入れ替え確認ダイアログ。
+ */
+function confirmCorrectMatch(matchId, info) {
+  const { currentWinnerId, currentWinnerName, currentLoserId, currentLoserName } = info;
+  const ui = SpreadsheetApp.getUi();
+
+  const confirmResponse = ui.alert(
+    "勝敗修正の確認",
+    `対戦ID: ${matchId}\n\n` +
+      `【現在】\n` +
+      `勝者: ${currentWinnerName} (${currentWinnerId})\n` +
+      `敗者: ${currentLoserName} (${currentLoserId})\n\n` +
+      `【修正後】\n` +
+      `勝者: ${currentLoserName} (${currentLoserId})\n` +
+      `敗者: ${currentWinnerName} (${currentWinnerId})\n\n` +
+      "勝敗を入れ替えますか？",
+    ui.ButtonSet.YES_NO
+  );
+
+  if (confirmResponse !== ui.Button.YES) {
+    ui.alert("処理をキャンセルしました。");
+    return false;
+  }
+
+  return true;
 }
 
 // =========================================

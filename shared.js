@@ -178,6 +178,24 @@ function getLastTableNumber(playerId) {
   return null;
 }
 
+/**
+ * 経過ミリ秒を HH:mm:ss 形式の文字列に変換する。
+ */
+function formatElapsedMs(elapsedMs) {
+  if (!Number.isFinite(elapsedMs) || elapsedMs < 0) {
+    return "00:00:00";
+  }
+  const totalSeconds = Math.floor(elapsedMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  const hh = Utilities.formatString("%02d", hours);
+  const mm = Utilities.formatString("%02d", minutes);
+  const ss = Utilities.formatString("%02d", seconds);
+  return `${hh}:${mm}:${ss}`;
+}
+
 // =========================================
 // UI共通ユーティリティ
 // =========================================

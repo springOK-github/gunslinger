@@ -226,6 +226,116 @@ function writeMatchResults(params) {
 }
 
 /**
+ * マッチングに必要なシート・データ・キャッシュをまとめて取得する。
+ * データ構造が揃わない場合は ok=false で返す。
+ */
+function loadMatchContext(ss) {
+  const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
+  const historySheet = ss.getSheetByName(SHEET_HISTORY);
+  const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
+  if (!playerSheet || !historySheet || !inProgressSheet) {
+    return { ok: false, message: "必要なシートが見つかりません。" };
+  }
+
+  const { indices: playerIndices, data: playerData } = getSheetStructure(playerSheet, SHEET_PLAYERS);
+  const { indices: historyIndices, data: historyData } = getSheetStructure(historySheet, SHEET_HISTORY);
+  const { indices: matchIndices, data: matchData } = getSheetStructure(inProgressSheet, SHEET_IN_PROGRESS);
+
+  const playerNameMap = buildPlayerNameMap(playerData, playerIndices);
+  const opponentsMap = buildOpponentsMap(historyData, historyIndices);
+  const waitingPlayers = getAndSortWaitingPlayers(playerData, playerIndices);
+
+  return {
+    ok: true,
+    playerSheet,
+    historySheet,
+    inProgressSheet,
+    playerIndices,
+    historyIndices,
+    matchIndices,
+    playerData,
+    historyData,
+    matchData,
+    playerNameMap,
+    opponentsMap,
+    waitingPlayers,
+  };
+}
+
+/**
+ * マッチング結果を計画する（データ書き込みはしない）。
+ */
+function planMatches(context) {
+  const { waitingPlayers, playerIndices, matchData, matchIndices, opponentsMap } = context;
+
+  if (waitingPlayers.length < 2) {
+    return {
+      ok: false,
+      reason: `警告: 現在待機中のプレイヤーは ${waitingPlayers.length} 人です。2人以上必要です。`,
+    };
+  }
+
+  Logger.log("--- 厳格な再戦回避マッチング開始 (勝者優先) ---");
+  const { matches, skippedPlayers } = findMatchPairs(waitingPlayers, playerIndices, opponentsMap);
+
+  if (skippedPlayers.length > 0) {
+    Logger.log(`警告: ${skippedPlayers.length} 人のプレイヤーは適切な相手が見つからなかったため、待機を継続します。`);
+  }
+
+  if (matches.length === 0) {
+    return { ok: false, reason: "警告: 新しいマッチングは成立しませんでした。" };
+  }
+
+  const { availableTables, usedTables } = getTableStatus(matchData, matchIndices);
+  const maxTables = getMaxTables();
+  const totalExistingTables = availableTables.length + usedTables.size;
+  const maxNewTables = Math.max(0, maxTables - totalExistingTables);
+  const totalAvailableSlots = availableTables.length + maxNewTables;
+
+  Logger.log(
+    `[デバッグ] 卓数情報: 最大=${maxTables}, 空き=${availableTables.length}, 使用中=${usedTables.size}, 新規作成可能=${maxNewTables}, 利用可能スロット=${totalAvailableSlots}`
+  );
+
+  const actualMatches = matches.slice(0, totalAvailableSlots);
+  const skippedMatches = matches.slice(totalAvailableSlots);
+
+  if (skippedMatches.length > 0) {
+    Logger.log(`警告: 卓数上限により ${skippedMatches.length} 組のマッチングを見送りました。`);
+    skippedMatches.forEach(([p1Id, p2Id]) => Logger.log(`見送り: ${p1Id} vs ${p2Id}`));
+  }
+
+  return {
+    ok: true,
+    actualMatches,
+    skippedMatches,
+    availableTables,
+    usedTables,
+  };
+}
+
+/**
+ * 計画したマッチをシートへ反映し、経過時間を更新する。
+ */
+function applyMatchPlan(plan, context) {
+  const { actualMatches, availableTables, usedTables } = plan;
+  const { playerSheet, playerData, playerIndices, inProgressSheet, matchData, playerNameMap } = context;
+
+  writeMatchResults({
+    actualMatches,
+    playerSheet,
+    playerData,
+    playerIndices,
+    inProgressSheet,
+    matchData,
+    playerNameMap,
+    availableTables,
+    usedTables,
+  });
+
+  updateAllMatchTimes();
+}
+
+/**
  * 待機中のプレイヤーを抽出し、再戦履歴を厳格に考慮してマッチングを行います。
  * 過去に対戦した相手しかいない場合、マッチングを成立させずに待機させます。
  */
@@ -248,81 +358,21 @@ function matchPlayers() {
   try {
     lock = acquireLock("マッチング実行");
 
-    // シート取得
-    const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
-    const historySheet = ss.getSheetByName(SHEET_HISTORY);
-    const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
-    if (!playerSheet || !historySheet || !inProgressSheet) {
-      Logger.log("エラー: 必要なシートが見つかりません。");
+    const ctx = loadMatchContext(ss);
+    if (!ctx.ok) {
+      Logger.log(`エラー: ${ctx.message}`);
       return 0;
     }
 
-    // データ取得
-    const { indices: playerIndices, data: playerData } = getSheetStructure(playerSheet, SHEET_PLAYERS);
-    const { indices: historyIndices, data: historyData } = getSheetStructure(historySheet, SHEET_HISTORY);
-    const { indices: matchIndices, data: matchData } = getSheetStructure(inProgressSheet, SHEET_IN_PROGRESS);
-
-    // マップ構築
-    const playerNameMap = buildPlayerNameMap(playerData, playerIndices);
-    const opponentsMap = buildOpponentsMap(historyData, historyIndices);
-
-    // 待機プレイヤー取得
-    const waitingPlayers = getAndSortWaitingPlayers(playerData, playerIndices);
-    if (waitingPlayers.length < 2) {
-      Logger.log(`警告: 現在待機中のプレイヤーは ${waitingPlayers.length} 人です。2人以上必要です。`);
+    const plan = planMatches(ctx);
+    if (!plan.ok) {
+      Logger.log(plan.reason);
       return 0;
     }
 
-    // マッチングペア決定
-    Logger.log("--- 厳格な再戦回避マッチング開始 (勝者優先) ---");
-    const { matches, skippedPlayers } = findMatchPairs(waitingPlayers, playerIndices, opponentsMap);
+    const actualMatches = plan.actualMatches;
 
-    if (skippedPlayers.length > 0) {
-      Logger.log(`警告: ${skippedPlayers.length} 人のプレイヤーは適切な相手が見つからなかったため、待機を継続します。`);
-    }
-
-    if (matches.length === 0) {
-      Logger.log("警告: 新しいマッチングは成立しませんでした。");
-      return 0;
-    }
-
-    // 卓の状態を取得
-    const { availableTables, usedTables } = getTableStatus(matchData, matchIndices);
-
-    // 卓数制限の計算
-    const maxTables = getMaxTables();
-    const totalExistingTables = availableTables.length + usedTables.size;
-    const maxNewTables = Math.max(0, maxTables - totalExistingTables);
-    const totalAvailableSlots = availableTables.length + maxNewTables;
-
-    Logger.log(
-      `[デバッグ] 卓数情報: 最大=${maxTables}, 空き=${availableTables.length}, 使用中=${usedTables.size}, 新規作成可能=${maxNewTables}, 利用可能スロット=${totalAvailableSlots}`
-    );
-
-    // 卓数制限を適用
-    const actualMatches = matches.slice(0, totalAvailableSlots);
-    const skippedMatches = matches.slice(totalAvailableSlots);
-
-    if (skippedMatches.length > 0) {
-      Logger.log(`警告: 卓数上限により ${skippedMatches.length} 組のマッチングを見送りました。`);
-      skippedMatches.forEach(([p1Id, p2Id]) => Logger.log(`見送り: ${p1Id} vs ${p2Id}`));
-    }
-
-    // シートに書き込み
-    writeMatchResults({
-      actualMatches,
-      playerSheet,
-      playerData,
-      playerIndices,
-      inProgressSheet,
-      matchData,
-      playerNameMap,
-      availableTables,
-      usedTables,
-    });
-
-    // 対戦時間を更新する
-    updateAllMatchTimes();
+    applyMatchPlan(plan, ctx);
 
     Logger.log(`マッチングが ${actualMatches.length} 件成立しました。「${SHEET_IN_PROGRESS}」シートを確認してください。`);
     return actualMatches.length;
@@ -343,73 +393,23 @@ function matchPlayers() {
  */
 function promptAndRecordResult() {
   const ui = SpreadsheetApp.getUi();
+  const winnerId = promptWinnerId();
+  if (!winnerId) return;
 
-  // 最初にユーザー入力を受け付け
-  const winnerResponse = ui.prompt("対戦結果の記録", `勝者のプレイヤーIDの**数字部分のみ**を入力してください (例: P001なら「1」)。`, ui.ButtonSet.OK_CANCEL);
-
-  if (winnerResponse.getSelectedButton() !== ui.Button.OK) {
-    ui.alert("処理をキャンセルしました。");
+  const lookup = findOpponentIdFromInProgress(winnerId);
+  if (!lookup.ok) {
+    ui.alert("エラー", lookup.message || "", ui.ButtonSet.OK);
     return;
   }
 
-  const rawId = winnerResponse.getResponseText().trim();
-
-  if (!/^\d+$/.test(rawId)) {
-    ui.alert("エラー: IDは数字のみで入力してください。");
-    return;
-  }
-
-  const formattedWinnerId = PLAYER_ID_PREFIX + Utilities.formatString(`%0${ID_DIGITS}d`, parseInt(rawId, 10));
-
-  // この時点でロックは取得しない
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
-  if (!inProgressSheet) {
-    ui.alert("エラー: 対戦中シートが見つかりません。");
-    return;
-  }
-  const { indices, data } = getSheetStructure(inProgressSheet, SHEET_IN_PROGRESS);
-  let loserId = null;
-
-  // 対戦相手の確認（ロック不要）
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    const p1 = row[indices["ID1"]];
-    const p2 = row[indices["ID2"]];
-
-    if (p1 === formattedWinnerId) {
-      loserId = p2;
-      break;
-    } else if (p2 === formattedWinnerId) {
-      loserId = p1;
-      break;
-    }
-  }
-
-  if (loserId === null) {
-    ui.alert(
-      `エラー: 勝者ID (${formattedWinnerId}) は「${SHEET_IN_PROGRESS}」シートに見つかりませんでした。\n入力IDが間違っているか、対戦が記録されていません。`
-    );
-    return;
-  }
-
-  // ユーザーに確認
-  const confirmResponse = ui.alert(
-    "対戦結果の確認",
-    `以下の内容で記録してよろしいですか？\n\n` + `勝者: ${getPlayerName(formattedWinnerId)}\n` + `敗者: ${getPlayerName(loserId)}`,
-    ui.ButtonSet.YES_NO
-  );
-
-  if (confirmResponse !== ui.Button.YES) {
-    ui.alert("処理をキャンセルしました。");
-    return;
-  }
+  const confirmed = confirmResultDialog(winnerId, lookup.opponentId);
+  if (!confirmed) return;
 
   try {
     // recordResult内でロックを取得するため、ここではロック不要
-    recordResult(formattedWinnerId);
+    recordResult(winnerId);
   } catch (e) {
-    ui.alert("エラーが発生しました: " + e.toString());
+    SpreadsheetApp.getUi().alert("エラーが発生しました: " + e.toString());
     Logger.log("promptAndRecordResult エラー: " + e.toString());
   }
 }
@@ -456,81 +456,62 @@ function correctMatchResult() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let lock = null;
 
-  // 1. 対戦IDの入力（ロック不要）
-  const response = ui.prompt("対戦結果の修正", "修正する対戦IDの**数字部分のみ**を入力してください (例: T0001なら「1」)。", ui.ButtonSet.OK_CANCEL);
+  const matchId = promptMatchId();
+  if (!matchId) return;
 
-  if (response.getSelectedButton() !== ui.Button.OK) {
-    ui.alert("処理をキャンセルしました。");
-    return;
-  }
-
-  const rawId = response.getResponseText().trim();
-  if (!/^\d+$/.test(rawId)) {
-    ui.alert("エラー", "IDは数字のみで入力してください。", ui.ButtonSet.OK);
-    return;
-  }
-
-  const matchId = "T" + Utilities.formatString("%04d", parseInt(rawId, 10));
-
-  // 2. 対戦履歴から該当の対戦を検索（ロック不要の読み取り）
   const historySheet = ss.getSheetByName(SHEET_HISTORY);
   if (!historySheet) {
     ui.alert("エラー", `シート「${SHEET_HISTORY}」が見つかりません。`, ui.ButtonSet.OK);
     return;
   }
-  const { indices: historyIndices, data: historyData } = getSheetStructure(historySheet, SHEET_HISTORY);
 
-  let matchRow = -1;
-  let matchDataRow = null;
-
-  for (let i = 1; i < historyData.length; i++) {
-    const row = historyData[i];
-    if (row[historyIndices["対戦ID"]] === matchId) {
-      matchRow = i + 1;
-      matchDataRow = row;
-      break;
-    }
-  }
-
-  if (matchRow === -1) {
-    ui.alert("エラー", `対戦ID ${matchId} が見つかりません。`, ui.ButtonSet.OK);
+  const found = findMatchById(historySheet, matchId);
+  if (!found.ok) {
+    ui.alert("エラー", found.message || "", ui.ButtonSet.OK);
     return;
   }
 
-  // 3. 現在の勝者と敗者を取得
+  const { matchRow, matchDataRow, historyIndices } = found;
+
+  const id1Col = historyIndices["ID1"];
+  const winnerNameCol = historyIndices["勝者名"];
+  const id2Col = historyIndices["ID2"];
+  const loserNameCol = historyIndices["敗者名"];
+
+  if (typeof id1Col !== "number" || typeof winnerNameCol !== "number" || typeof id2Col !== "number" || typeof loserNameCol !== "number") {
+    ui.alert("エラー", "履歴シートのヘッダーが不足しています。", ui.ButtonSet.OK);
+    return;
+  }
+
+  const targetRow = Number(matchRow);
+  const colId1 = id1Col;
+  const colWinnerName = winnerNameCol;
+  const colId2 = id2Col;
+  const colLoserName = loserNameCol;
+
   const currentWinnerId = matchDataRow[historyIndices["ID1"]];
   const currentWinnerName = matchDataRow[historyIndices["勝者名"]];
   const currentLoserId = matchDataRow[historyIndices["ID2"]];
   const currentLoserName = matchDataRow[historyIndices["敗者名"]];
 
-  // 4. 修正の確認（ロック不要）
-  const confirmResponse = ui.alert(
-    "勝敗修正の確認",
-    `対戦ID: ${matchId}\n\n` +
-      `【現在】\n` +
-      `勝者: ${currentWinnerName} (${currentWinnerId})\n` +
-      `敗者: ${currentLoserName} (${currentLoserId})\n\n` +
-      `【修正後】\n` +
-      `勝者: ${currentLoserName} (${currentLoserId})\n` +
-      `敗者: ${currentWinnerName} (${currentWinnerId})\n\n` +
-      "勝敗を入れ替えますか？",
-    ui.ButtonSet.YES_NO
-  );
+  const confirmed = confirmCorrectMatch(matchId, {
+    currentWinnerId,
+    currentWinnerName,
+    currentLoserId,
+    currentLoserName,
+  });
 
-  if (confirmResponse !== ui.Button.YES) {
-    ui.alert("処理をキャンセルしました。");
-    return;
-  }
+  if (!confirmed) return;
 
   try {
     // 確認後にロックを取得して更新処理
     lock = acquireLock("対戦結果の修正");
 
     // 5. 対戦履歴を更新（勝者と敗者を入れ替え）
-    historySheet.getRange(matchRow, historyIndices["ID1"] + 1).setValue(currentLoserId);
-    historySheet.getRange(matchRow, historyIndices["勝者名"] + 1).setValue(currentLoserName);
-    historySheet.getRange(matchRow, historyIndices["ID2"] + 1).setValue(currentWinnerId);
-    historySheet.getRange(matchRow, historyIndices["敗者名"] + 1).setValue(currentWinnerName);
+    historySheet.getRange(targetRow, colId1 + 1).setValue(currentLoserId);
+    historySheet.getRange(targetRow, colWinnerName + 1).setValue(currentLoserName);
+    historySheet.getRange(targetRow, colId2 + 1).setValue(currentWinnerId);
+    historySheet.getRange(targetRow, colLoserName + 1).setValue(currentWinnerName);
 
     // 6. プレイヤーの統計を修正
     const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
@@ -569,6 +550,141 @@ function correctMatchResult() {
   }
 }
 
+/**
+ * 勝者IDの入力とバリデーションを行い、整形済みIDを返す。
+ */
+function promptWinnerId() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.prompt("対戦結果の記録", `勝者のプレイヤーIDの**数字部分のみ**を入力してください (例: P001なら「1」)。`, ui.ButtonSet.OK_CANCEL);
+
+  if (response.getSelectedButton() !== ui.Button.OK) {
+    ui.alert("処理をキャンセルしました。");
+    return null;
+  }
+
+  const rawId = response.getResponseText().trim();
+  if (!/^\d+$/.test(rawId)) {
+    ui.alert("エラー: IDは数字のみで入力してください。");
+    return null;
+  }
+
+  return PLAYER_ID_PREFIX + Utilities.formatString(`%0${ID_DIGITS}d`, parseInt(rawId, 10));
+}
+
+/**
+ * 対戦中シートから勝者IDに対応する相手IDを取得する。
+ */
+function findOpponentIdFromInProgress(winnerId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const inProgressSheet = ss.getSheetByName(SHEET_IN_PROGRESS);
+  if (!inProgressSheet) {
+    return { ok: false, message: `シート「${SHEET_IN_PROGRESS}」が見つかりません。` };
+  }
+
+  const { indices, data } = getSheetStructure(inProgressSheet, SHEET_IN_PROGRESS);
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const p1 = row[indices["ID1"]];
+    const p2 = row[indices["ID2"]];
+
+    if (p1 === winnerId) {
+      return { ok: true, opponentId: p2 };
+    } else if (p2 === winnerId) {
+      return { ok: true, opponentId: p1 };
+    }
+  }
+
+  return {
+    ok: false,
+    message: `勝者ID (${winnerId}) は「${SHEET_IN_PROGRESS}」シートに見つかりませんでした。\n入力IDが間違っているか、対戦が記録されていません。`,
+  };
+}
+
+/**
+ * 対戦結果記録の確認ダイアログ。
+ */
+function confirmResultDialog(winnerId, loserId) {
+  const ui = SpreadsheetApp.getUi();
+  const confirmResponse = ui.alert(
+    "対戦結果の確認",
+    `以下の内容で記録してよろしいですか？\n\n` + `勝者: ${getPlayerName(winnerId)}\n` + `敗者: ${getPlayerName(loserId)}`,
+    ui.ButtonSet.YES_NO
+  );
+
+  if (confirmResponse !== ui.Button.YES) {
+    ui.alert("処理をキャンセルしました。");
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * 対戦IDの入力とバリデーションを行う。
+ */
+function promptMatchId() {
+  const ui = SpreadsheetApp.getUi();
+  const response = ui.prompt("対戦結果の修正", "修正する対戦IDの**数字部分のみ**を入力してください (例: T0001なら「1」)。", ui.ButtonSet.OK_CANCEL);
+
+  if (response.getSelectedButton() !== ui.Button.OK) {
+    ui.alert("処理をキャンセルしました。");
+    return null;
+  }
+
+  const rawId = response.getResponseText().trim();
+  if (!/^\d+$/.test(rawId)) {
+    ui.alert("エラー", "IDは数字のみで入力してください。", ui.ButtonSet.OK);
+    return null;
+  }
+
+  return "T" + Utilities.formatString("%04d", parseInt(rawId, 10));
+}
+
+/**
+ * 対戦履歴シートから対戦IDで行を検索する。
+ */
+function findMatchById(historySheet, matchId) {
+  const { indices: historyIndices, data: historyData } = getSheetStructure(historySheet, SHEET_HISTORY);
+
+  for (let i = 1; i < historyData.length; i++) {
+    const row = historyData[i];
+    if (row[historyIndices["対戦ID"]] === matchId) {
+      return { ok: true, matchRow: i + 1, matchDataRow: row, historyIndices };
+    }
+  }
+
+  return { ok: false, message: `対戦ID ${matchId} が見つかりません。` };
+}
+
+/**
+ * 勝敗入れ替え確認ダイアログ。
+ */
+function confirmCorrectMatch(matchId, info) {
+  const { currentWinnerId, currentWinnerName, currentLoserId, currentLoserName } = info;
+  const ui = SpreadsheetApp.getUi();
+
+  const confirmResponse = ui.alert(
+    "勝敗修正の確認",
+    `対戦ID: ${matchId}\n\n` +
+      `【現在】\n` +
+      `勝者: ${currentWinnerName} (${currentWinnerId})\n` +
+      `敗者: ${currentLoserName} (${currentLoserId})\n\n` +
+      `【修正後】\n` +
+      `勝者: ${currentLoserName} (${currentLoserId})\n` +
+      `敗者: ${currentWinnerName} (${currentWinnerId})\n\n` +
+      "勝敗を入れ替えますか？",
+    ui.ButtonSet.YES_NO
+  );
+
+  if (confirmResponse !== ui.Button.YES) {
+    ui.alert("処理をキャンセルしました。");
+    return false;
+  }
+
+  return true;
+}
+
 // =========================================
 // 対戦時間更新
 // =========================================
@@ -580,7 +696,7 @@ function updateAllMatchTimes() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
   let updatedCount = 0;
-  const currentTime = new Date();
+  const now = new Date();
   let matchLock = null;
 
   try {
@@ -591,19 +707,36 @@ function updateAllMatchTimes() {
       Logger.log(`エラー: シート「${SHEET_IN_PROGRESS}」が見つかりません。`);
       return;
     }
+
     const { indices, data } = getSheetStructure(inProgressSheet, SHEET_IN_PROGRESS);
+    if (data.length <= 1) {
+      Logger.log("対戦時間更新: 対戦中の行がありません。");
+      return;
+    }
+
+    const startCol = indices["対戦開始時刻"];
+    const elapsedCol = indices["経過時間"];
+
+    const elapsedValues = [];
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
-      const startTime = new Date(row[indices["対戦開始時刻"]]);
-      // 対戦開始時刻が存在する場合のみ更新
-      if (startTime.toString() !== "Invalid Date") {
-        const elapsedMs = currentTime.getTime() - startTime.getTime();
-        const elapsedDate = new Date(elapsedMs);
-        const formattedElapsed = Utilities.formatDate(elapsedDate, "UTC", "HH:mm:ss");
-        inProgressSheet.getRange(i + 1, indices["経過時間"] + 1).setValue(formattedElapsed);
-        updatedCount++;
+      const startTime = new Date(row[startCol]);
+      if (startTime.toString() === "Invalid Date") {
+        elapsedValues.push([""]);
+        continue;
       }
+
+      const elapsedMs = now.getTime() - startTime.getTime();
+      // 負の値は0扱い（時刻不整合の防御）
+      const safeMs = Math.max(0, elapsedMs);
+      const formattedElapsed = formatElapsedMs(safeMs);
+      elapsedValues.push([formattedElapsed]);
+      updatedCount++;
     }
+
+    // まとめて書き込み
+    inProgressSheet.getRange(2, elapsedCol + 1, elapsedValues.length, 1).setValues(elapsedValues);
+
     Logger.log(`対戦時間が ${updatedCount} 卓分更新されました。`);
   } catch (e) {
     Logger.log("updateAllMatchTimes エラー: " + e?.toString());

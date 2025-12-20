@@ -484,10 +484,10 @@ function correctMatchResult() {
   }
 
   const targetRow = Number(matchRow);
-  const colId1 = Number(id1Col);
-  const colWinnerName = Number(winnerNameCol);
-  const colId2 = Number(id2Col);
-  const colLoserName = Number(loserNameCol);
+  const colId1 = id1Col;
+  const colWinnerName = winnerNameCol;
+  const colId2 = id2Col;
+  const colLoserName = loserNameCol;
 
   const currentWinnerId = matchDataRow[historyIndices["ID1"]];
   const currentWinnerName = matchDataRow[historyIndices["勝者名"]];

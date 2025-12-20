@@ -370,7 +370,7 @@ function matchPlayers() {
       return 0;
     }
 
-    const actualMatches = plan.actualMatches || [];
+    const actualMatches = plan.actualMatches;
 
     applyMatchPlan(plan, ctx);
 

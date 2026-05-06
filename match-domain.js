@@ -293,7 +293,7 @@ function planMatches(context) {
   const totalAvailableSlots = availableTables.length + maxNewTables;
 
   Logger.log(
-    `[デバッグ] 卓数情報: 最大=${maxTables}, 空き=${availableTables.length}, 使用中=${usedTables.size}, 新規作成可能=${maxNewTables}, 利用可能スロット=${totalAvailableSlots}`
+    `[デバッグ] 卓数情報: 最大=${maxTables}, 空き=${availableTables.length}, 使用中=${usedTables.size}, 新規作成可能=${maxNewTables}, 利用可能スロット=${totalAvailableSlots}`,
   );
 
   const actualMatches = matches.slice(0, totalAvailableSlots);
@@ -609,7 +609,7 @@ function confirmResultDialog(winnerId, loserId) {
   const confirmResponse = ui.alert(
     "対戦結果の確認",
     `以下の内容で記録してよろしいですか？\n\n` + `勝者: ${getPlayerName(winnerId)}\n` + `敗者: ${getPlayerName(loserId)}`,
-    ui.ButtonSet.YES_NO
+    ui.ButtonSet.YES_NO,
   );
 
   if (confirmResponse !== ui.Button.YES) {
@@ -674,7 +674,7 @@ function confirmCorrectMatch(matchId, info) {
       `勝者: ${currentLoserName} (${currentLoserId})\n` +
       `敗者: ${currentWinnerName} (${currentWinnerId})\n\n` +
       "勝敗を入れ替えますか？",
-    ui.ButtonSet.YES_NO
+    ui.ButtonSet.YES_NO,
   );
 
   if (confirmResponse !== ui.Button.YES) {
@@ -742,61 +742,5 @@ function updateAllMatchTimes() {
     Logger.log("updateAllMatchTimes エラー: " + e?.toString());
   } finally {
     releaseLock(matchLock);
-  }
-}
-
-// =========================================
-// マッチング実行のデファード呼び出し
-// =========================================
-
-/**
- * matchPlayers を非同期に一度だけ実行するためのキューイング。
- * 同一時点で複数回呼ばれても、トリガーは1つだけ作成する。
- */
-function deferMatchPlayers() {
-  try {
-    const props = PropertiesService.getDocumentProperties();
-    props.setProperty("PENDING_MATCH_PLAYERS", "1");
-
-    const triggers = ScriptApp.getProjectTriggers();
-    const alreadyScheduled = triggers.some((t) => t.getHandlerFunction() === "runDeferredMatchPlayers");
-    if (!alreadyScheduled) {
-      ScriptApp.newTrigger("runDeferredMatchPlayers").timeBased().everyMinutes(1).create();
-    }
-  } catch (e) {
-    Logger.log("deferMatchPlayers エラー: " + e?.toString());
-  }
-}
-
-/**
- * deferMatchPlayers でキューされたマッチングを実行する。
- * トリガー自体は実行後に削除しておく。
- */
-function runDeferredMatchPlayers() {
-  const props = PropertiesService.getDocumentProperties();
-  const pending = props.getProperty("PENDING_MATCH_PLAYERS");
-  props.deleteProperty("PENDING_MATCH_PLAYERS");
-
-  // トリガーのクリーンアップ（複数存在する場合も削除）
-  try {
-    const triggers = ScriptApp.getProjectTriggers();
-    triggers.forEach((t) => {
-      if (t.getHandlerFunction() === "runDeferredMatchPlayers") {
-        ScriptApp.deleteTrigger(t);
-      }
-    });
-  } catch (e) {
-    Logger.log("runDeferredMatchPlayers: トリガー削除エラー: " + e?.toString());
-  }
-
-  if (!pending) {
-    Logger.log("runDeferredMatchPlayers: 保留中のマッチングはありません。");
-    return;
-  }
-
-  try {
-    matchPlayers();
-  } catch (e) {
-    Logger.log("runDeferredMatchPlayers: matchPlayers 実行エラー: " + e?.toString());
   }
 }

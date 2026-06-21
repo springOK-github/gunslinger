@@ -18,9 +18,17 @@ function registerTestPlayers() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
   let lock = null;
+  const autoMatchingGate = withAutoMatchingGate("テストプレイヤー登録", (gate) => gate);
+
+  if (!autoMatchingGate) {
+    return;
+  }
 
   try {
     lock = acquireLock("テストプレイヤー登録");
+    if (!autoMatchingGate.assertUnchanged()) {
+      return;
+    }
     const { indices, data } = getSheetStructure(playerSheet, SHEET_PLAYERS);
 
     // 既存の最大ID番号を取得（本物のregisterPlayer()と同じロジック）
@@ -47,7 +55,7 @@ function registerTestPlayers() {
 
       playerSheet.appendRow([newId, playerName, 0, 0, 0, PLAYER_STATUS.WAITING, formattedTime]);
       Logger.log(`プレイヤー ${playerName} (${newId}) を登録しました。`);
-      matchPlayers(); // 登録都度マッチングさせる
+      runAutoMatchingCycle(); // 登録都度マッチングさせる
     }
   } catch (e) {
     Logger.log("registerTestPlayers エラー: " + e.toString());

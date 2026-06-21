@@ -122,6 +122,112 @@ function getMaxUsedTableNumber() {
 }
 
 /**
+ * 自動マッチングの現在状態を取得します。
+ * @returns {{busy: boolean, sequence: number}}
+ */
+function getAutoMatchingState() {
+  const props = PropertiesService.getDocumentProperties();
+
+  let sequence = 0;
+  try {
+    sequence = parseInt(props.getProperty(AUTO_MATCHING_SEQUENCE_PROPERTY) || "0", 10) || 0;
+  } catch (e) {
+    Logger.log("getAutoMatchingState: sequence の取得に失敗: " + (e && e.toString()));
+  }
+
+  let busy = false;
+  try {
+    busy = props.getProperty(AUTO_MATCHING_BUSY_PROPERTY) === "1";
+  } catch (e) {
+    Logger.log("getAutoMatchingState: busy の取得に失敗: " + (e && e.toString()));
+  }
+
+  return { busy, sequence };
+}
+
+/**
+ * 自動マッチング開始時に状態を更新します。
+ */
+function beginAutoMatchingCycle() {
+  const props = PropertiesService.getDocumentProperties();
+  const state = getAutoMatchingState();
+  props.setProperty(AUTO_MATCHING_BUSY_PROPERTY, "1");
+  props.setProperty(AUTO_MATCHING_SEQUENCE_PROPERTY, String(state.sequence + 1));
+}
+
+/**
+ * 自動マッチングの実行可否を判定し、実行可能なら callback を呼び出します。
+ * @param {string} actionName
+ * @param {(gate: {busy: boolean, sequence: number, assertUnchanged: (gateActionName?: string) => boolean}) => any} callback
+ * @returns {any}
+ */
+function withAutoMatchingGate(actionName, callback) {
+  const ui = SpreadsheetApp.getUi();
+  const snapshot = getAutoMatchingState();
+
+  if (snapshot.busy) {
+    ui.alert("自動マッチング中", `${actionName}は自動マッチング処理中は実行できません。処理完了後に再実行してください。`, ui.ButtonSet.OK);
+    return null;
+  }
+
+  const gate = {
+    busy: snapshot.busy,
+    sequence: snapshot.sequence,
+    /**
+     * 実行中に自動マッチングの状態が変わっていないことを確認します。
+     * @param {string} [gateActionName]
+     * @returns {boolean}
+     */
+    assertUnchanged(gateActionName = actionName) {
+      const current = getAutoMatchingState();
+      const ui = SpreadsheetApp.getUi();
+
+      if (current.busy) {
+        ui.alert("自動マッチング中", `${gateActionName}は自動マッチング処理が完了するまで実行できません。`, ui.ButtonSet.OK);
+        return false;
+      }
+
+      if (current.sequence !== gate.sequence) {
+        ui.alert("自動マッチング中", `${gateActionName}の実行中に自動マッチングが走りました。もう一度やり直してください。`, ui.ButtonSet.OK);
+        return false;
+      }
+
+      return true;
+    },
+  };
+
+  return callback(gate);
+}
+
+/**
+ * 自動マッチング終了時に状態を更新します。
+ */
+function endAutoMatchingCycle() {
+  const props = PropertiesService.getDocumentProperties();
+  const state = getAutoMatchingState();
+  props.setProperty(AUTO_MATCHING_SEQUENCE_PROPERTY, String(state.sequence + 1));
+  try {
+    props.deleteProperty(AUTO_MATCHING_BUSY_PROPERTY);
+  } catch (e) {
+    Logger.log("endAutoMatchingCycle: busy の解除に失敗: " + (e && e.toString()));
+  }
+}
+
+
+/**
+ * 自動マッチングを実行し、終了時に状態を更新します。
+ * @returns {number}
+ */
+function runAutoMatchingCycle() {
+  try {
+    beginAutoMatchingCycle();
+    return matchPlayers();
+  } finally {
+    endAutoMatchingCycle();
+  }
+}
+
+/**
  * 使用可能な次の卓番号を取得します
  * @param {GoogleAppsScript.Spreadsheet.Sheet} inProgressSheet マッチングシート
  * @returns {number} 使用可能な次の卓番号
@@ -236,6 +342,11 @@ function promptPlayerId(title, message) {
  */
 function changePlayerStatus(config) {
   const ui = SpreadsheetApp.getUi();
+  const autoMatchingGate = withAutoMatchingGate(config.actionName, (gate) => gate);
+
+  if (!autoMatchingGate) {
+    return;
+  }
 
   const playerId = promptPlayerId(config.actionName, config.promptMessage);
   if (!playerId) return;

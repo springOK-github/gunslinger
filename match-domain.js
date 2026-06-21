@@ -393,6 +393,12 @@ function matchPlayers() {
  */
 function promptAndRecordResult() {
   const ui = SpreadsheetApp.getUi();
+  const autoMatchingGate = withAutoMatchingGate("対戦結果の記録", (gate) => gate);
+
+  if (!autoMatchingGate) {
+    return;
+  }
+
   const winnerId = promptWinnerId();
   if (!winnerId) return;
 
@@ -412,6 +418,10 @@ function promptAndRecordResult() {
 
   const confirmed = confirmResultDialog(winnerId, loserId, winnerNextStatus, loserNextStatus);
   if (!confirmed) return;
+
+  if (!autoMatchingGate.assertUnchanged()) {
+    return;
+  }
 
   try {
     // recordResult内でロックを取得するため、ここではロック不要
@@ -468,7 +478,12 @@ function recordResult(winnerId, winnerNextStatus, loserNextStatus) {
 function correctMatchResult() {
   const ui = SpreadsheetApp.getUi();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const autoMatchingGate = withAutoMatchingGate("対戦結果の修正", (gate) => gate);
   let lock = null;
+
+  if (!autoMatchingGate) {
+    return;
+  }
 
   const matchId = promptMatchId();
   if (!matchId) return;
@@ -520,6 +535,10 @@ function correctMatchResult() {
   try {
     // 確認後にロックを取得して更新処理
     lock = acquireLock("対戦結果の修正");
+
+    if (!autoMatchingGate.assertUnchanged()) {
+      return;
+    }
 
     // 5. 対戦履歴を更新（勝者と敗者を入れ替え）
     historySheet.getRange(targetRow, colId1 + 1).setValue(currentLoserId);

@@ -22,6 +22,10 @@ const TABLE_CONFIG = {
   MIN_TABLE_NUMBER: 1, // 最小卓番号
 };
 
+// 自動マッチングの実行状態を管理する PropertiesService キー
+const AUTO_MATCHING_BUSY_PROPERTY = "AUTO_MATCHING_BUSY";
+const AUTO_MATCHING_SEQUENCE_PROPERTY = "AUTO_MATCHING_SEQUENCE";
+
 // 各シートの必須ヘッダー定義
 const REQUIRED_HEADERS = {
   [SHEET_PLAYERS]: ["プレイヤーID", "プレイヤー名", "勝数", "敗数", "試合数", "参加状況", "最終対戦時刻"],

@@ -402,22 +402,33 @@ function promptAndRecordResult() {
     return;
   }
 
-  const confirmed = confirmResultDialog(winnerId, lookup.opponentId);
+  const loserId = lookup.opponentId;
+
+  const winnerNextStatus = promptNextStatus(getPlayerName(winnerId), "勝者");
+  if (winnerNextStatus === null) return;
+
+  const loserNextStatus = promptNextStatus(getPlayerName(loserId), "敗者");
+  if (loserNextStatus === null) return;
+
+  const confirmed = confirmResultDialog(winnerId, loserId, winnerNextStatus, loserNextStatus);
   if (!confirmed) return;
 
   try {
     // recordResult内でロックを取得するため、ここではロック不要
-    recordResult(winnerId);
+    recordResult(winnerId, winnerNextStatus, loserNextStatus);
   } catch (e) {
-    SpreadsheetApp.getUi().alert("エラーが発生しました: " + e.toString());
+    ui.alert("エラーが発生しました: " + e.toString());
     Logger.log("promptAndRecordResult エラー: " + e.toString());
   }
 }
 
 /**
  * 対戦結果を記録し、プレイヤーの統計情報とステータスを更新し、自動で次をマッチングします。
+ * @param {string} winnerId - 勝者のプレイヤーID
+ * @param {string} [winnerNextStatus] - 勝者の対戦後ステータス（省略時: WAITING）
+ * @param {string} [loserNextStatus] - 敗者の対戦後ステータス（省略時: WAITING）
  */
-function recordResult(winnerId) {
+function recordResult(winnerId, winnerNextStatus, loserNextStatus) {
   const ui = SpreadsheetApp.getUi();
 
   if (!winnerId) {
@@ -425,11 +436,14 @@ function recordResult(winnerId) {
     return;
   }
 
+  const resolvedWinnerStatus = winnerNextStatus || PLAYER_STATUS.WAITING;
+  const resolvedLoserStatus = loserNextStatus || PLAYER_STATUS.WAITING;
+
   // 共通処理を呼び出し
   const result = updatePlayerState({
     targetPlayerId: winnerId,
-    newStatus: PLAYER_STATUS.WAITING,
-    opponentNewStatus: PLAYER_STATUS.WAITING,
+    newStatus: resolvedWinnerStatus,
+    opponentNewStatus: resolvedLoserStatus,
     recordResult: true,
     isTargetWinner: true,
   });
@@ -439,7 +453,7 @@ function recordResult(winnerId) {
     return;
   }
 
-  Logger.log(`対戦結果が記録されました。勝者: ${winnerId}, 敗者: ${result.opponentId}。両プレイヤーは待機状態に戻りました。`);
+  Logger.log(`対戦結果が記録されました。勝者: ${winnerId} → ${resolvedWinnerStatus}, 敗者: ${result.opponentId} → ${resolvedLoserStatus}。`);
 }
 
 // =========================================
@@ -602,13 +616,53 @@ function findOpponentIdFromInProgress(winnerId) {
 }
 
 /**
- * 対戦結果記録の確認ダイアログ。
+ * 対戦後のプレイヤーステータスを選択させるダイアログを表示します。
+ * @param {string} playerName - プレイヤー名
+ * @param {string} role - "勝者" or "敗者"
+ * @returns {string|null} 選択されたステータス定数、キャンセル時はnull
  */
-function confirmResultDialog(winnerId, loserId) {
+function promptNextStatus(playerName, role) {
   const ui = SpreadsheetApp.getUi();
+  const response = ui.prompt(
+    `${role}の対戦後ステータス`,
+    `${role}: ${playerName}\n\n対戦後の状態を番号で入力してください（省略可: 1）:\n1: 待機（次のマッチングへ）\n2: 休憩\n3: ドロップアウト（大会終了）`,
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (response.getSelectedButton() !== ui.Button.OK) {
+    ui.alert("処理をキャンセルしました。");
+    return null;
+  }
+
+  const input = response.getResponseText().trim();
+  switch (input) {
+    case "2": return PLAYER_STATUS.RESTING;
+    case "3": return PLAYER_STATUS.DROPPED;
+    default:  return PLAYER_STATUS.WAITING; // "1" または空欄はデフォルト待機
+  }
+}
+
+/**
+ * 対戦結果記録の確認ダイアログ。
+ * @param {string} winnerId
+ * @param {string} loserId
+ * @param {string} winnerNextStatus
+ * @param {string} loserNextStatus
+ */
+function confirmResultDialog(winnerId, loserId, winnerNextStatus, loserNextStatus) {
+  const ui = SpreadsheetApp.getUi();
+
+  const statusLabel = (s) => {
+    if (s === PLAYER_STATUS.RESTING) return "休憩";
+    if (s === PLAYER_STATUS.DROPPED) return "ドロップアウト";
+    return "待機";
+  };
+
   const confirmResponse = ui.alert(
     "対戦結果の確認",
-    `以下の内容で記録してよろしいですか？\n\n` + `勝者: ${getPlayerName(winnerId)}\n` + `敗者: ${getPlayerName(loserId)}`,
+    `以下の内容で記録してよろしいですか？\n\n` +
+      `勝者: ${getPlayerName(winnerId)}（→ ${statusLabel(winnerNextStatus)}）\n` +
+      `敗者: ${getPlayerName(loserId)}（→ ${statusLabel(loserNextStatus)}）`,
     ui.ButtonSet.YES_NO,
   );
 

@@ -1,12 +1,14 @@
 {
   "compilerOptions": {
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "target": "ESNext",
-    "jsx": "react",
+    "target": "ES2020",
     "checkJs": true,
-    "strictNullChecks": true,
-    "strictFunctionTypes": true
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "strictFunctionTypes": false,
+    "useUnknownInCatchVariables": false
+  },
+  "typeAcquisition": {
+    "include": ["google-apps-script"]
   },
   "include": ["**/*"],
   "exclude": ["node_modules", "**/node_modules/*"]

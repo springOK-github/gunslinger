@@ -84,7 +84,8 @@ function registerPlayer() {
     playerSheet.appendRow([newId, playerName, 0, 0, 0, PLAYER_STATUS.WAITING, formattedTime]);
     Logger.log(`プレイヤー ${newId} を登録しました。`);
 
-    const waitingPlayersCount = getWaitingPlayers().length;
+    data.push([newId, playerName, 0, 0, 0, PLAYER_STATUS.WAITING, formattedTime]);
+    const waitingPlayersCount = getAndSortWaitingPlayers(data, indices).length;
     if (waitingPlayersCount >= 2) {
       Logger.log(`プレイヤー登録後、待機プレイヤーが ${waitingPlayersCount} 人いるため、自動でマッチングを開始します。`);
       shouldRunMatching = true;
@@ -361,17 +362,20 @@ function returnPlayerFromResting() {
       ui.alert("エラー: プレイヤーシートが見つかりません。");
       return;
     }
-    const { indices: freshIndices } = getSheetStructure(freshPlayerSheet, SHEET_PLAYERS);
+    const { indices: freshIndices, data: freshData } = getSheetStructure(freshPlayerSheet, SHEET_PLAYERS);
     freshPlayerSheet.getRange(targetRowIndex, freshIndices["参加状況"] + 1).setValue(PLAYER_STATUS.WAITING);
 
-    // 待機者が2人以上いれば自動マッチング
-    const waitingPlayersCount = getWaitingPlayers().length;
+    if (targetRowIndex > 1 && targetRowIndex - 1 < freshData.length) {
+      freshData[targetRowIndex - 1][freshIndices["参加状況"]] = PLAYER_STATUS.WAITING;
+    }
+
+    const waitingPlayersCount = getAndSortWaitingPlayers(freshData, freshIndices).length;
     if (waitingPlayersCount >= 2) {
       Logger.log(`復帰後、待機プレイヤーが ${waitingPlayersCount} 人いるため、自動でマッチングを開始します。`);
       shouldRunMatching = true;
     }
 
-    Logger.log(`プレイヤー ${playerId} を休憩から復帰させました。`);
+    Logger.log(`プレイヤー ${playerId} を休憩から復帰させました。待機プレイヤー: ${waitingPlayersCount} 人`);
   } catch (e) {
     ui.alert("エラーが発生しました: " + e.toString());
     Logger.log("returnPlayerFromResting エラー: " + e.toString());
@@ -395,7 +399,7 @@ function returnPlayerFromResting() {
 /**
  * 待機中のプレイヤーを抽出し、以下の優先順位でソートして返します。
  * 1. 勝数（降順）
- * 2. 最終対戦時刻（降順 = 最近待機に戻った人優先 = 直近の勝者優先）
+ * 2. 最終対戦時刻（昇順 = 古く待機している人優先）
  */
 function getWaitingPlayers() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -635,13 +639,15 @@ function updatePlayerState(options) {
       const playerId = row[playerIndices["プレイヤーID"]];
       if (playerId === targetPlayerId) {
         playerSheet.getRange(i + 1, playerIndices["参加状況"] + 1).setValue(newStatus);
+        row[playerIndices["参加状況"]] = newStatus;
       } else if (playerId === opponentId) {
         playerSheet.getRange(i + 1, playerIndices["参加状況"] + 1).setValue(opponentNewStatus);
+        row[playerIndices["参加状況"]] = opponentNewStatus;
       }
     }
 
     // 7. 必要に応じて次のマッチング
-    const waitingPlayersCount = getWaitingPlayers().length;
+    const waitingPlayersCount = getAndSortWaitingPlayers(playerData, playerIndices).length;
     shouldRunMatching = waitingPlayersCount >= 2;
 
     result = {
@@ -650,7 +656,7 @@ function updatePlayerState(options) {
       opponentId,
     };
   } catch (e) {
-    Logger.log("handleMatchStateChange エラー: " + e.message);
+    Logger.log("updatePlayerState エラー: " + e.message);
     result = {
       success: false,
       message: "エラーが発生しました: " + e.toString(),
@@ -663,7 +669,7 @@ function updatePlayerState(options) {
     try {
       runAutoMatchingCycle();
     } catch (e) {
-      Logger.log("handleMatchStateChange: matchPlayers 実行エラー: " + e.toString());
+      Logger.log("updatePlayerState: matchPlayers 実行エラー: " + e.toString());
     }
   }
 

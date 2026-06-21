@@ -27,6 +27,8 @@ function registerPlayer() {
 
   const inputPlayerName = response.getResponseText().trim();
 
+  let shouldRunMatching = false;
+
   try {
     lock = acquireLock("プレイヤー登録");
 
@@ -76,7 +78,7 @@ function registerPlayer() {
     const waitingPlayersCount = getWaitingPlayers().length;
     if (waitingPlayersCount >= 2) {
       Logger.log(`プレイヤー登録後、待機プレイヤーが ${waitingPlayersCount} 人いるため、自動でマッチングを開始します。`);
-      matchPlayers();
+      shouldRunMatching = true;
     } else {
       Logger.log(`プレイヤー登録後、待機プレイヤーが ${waitingPlayersCount} 人です。自動マッチングはスキップされました。`);
     }
@@ -85,6 +87,14 @@ function registerPlayer() {
     Logger.log("registerPlayer エラー: " + e.toString());
   } finally {
     releaseLock(lock);
+  }
+
+  if (shouldRunMatching) {
+    try {
+      matchPlayers();
+    } catch (e) {
+      Logger.log("registerPlayer: matchPlayers 実行エラー: " + e.toString());
+    }
   }
 }
 
@@ -141,7 +151,7 @@ function editPlayerName() {
   const confirm = ui.alert(
     "編集の確認",
     `プレイヤーID: ${playerId}\n現在の名前: ${currentName}\n新しい名前: ${newName}\n\nこの内容で更新しますか？`,
-    ui.ButtonSet.YES_NO
+    ui.ButtonSet.YES_NO,
   );
   if (confirm !== ui.Button.YES) {
     ui.alert("処理をキャンセルしました。");
@@ -305,13 +315,15 @@ function returnPlayerFromResting() {
   const confirmResponse = ui.alert(
     "復帰の確認",
     `プレイヤー名: ${playerName}\nプレイヤーID: ${playerId}\n\n休憩から待機状態に復帰させます。\n\nよろしいですか？`,
-    ui.ButtonSet.YES_NO
+    ui.ButtonSet.YES_NO,
   );
 
   if (confirmResponse !== ui.Button.YES) {
     ui.alert("処理をキャンセルしました。");
     return;
   }
+
+  let shouldRunMatching = false;
 
   try {
     // 確認後にロックを取得して状態変更
@@ -330,7 +342,7 @@ function returnPlayerFromResting() {
     const waitingPlayersCount = getWaitingPlayers().length;
     if (waitingPlayersCount >= 2) {
       Logger.log(`復帰後、待機プレイヤーが ${waitingPlayersCount} 人いるため、自動でマッチングを開始します。`);
-      matchPlayers();
+      shouldRunMatching = true;
     }
 
     Logger.log(`プレイヤー ${playerId} を休憩から復帰させました。`);
@@ -339,6 +351,14 @@ function returnPlayerFromResting() {
     Logger.log("returnPlayerFromResting エラー: " + e.toString());
   } finally {
     releaseLock(lock);
+  }
+
+  if (shouldRunMatching) {
+    try {
+      matchPlayers();
+    } catch (e) {
+      Logger.log("returnPlayerFromResting: matchPlayers 実行エラー: " + e.toString());
+    }
   }
 }
 

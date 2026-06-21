@@ -626,7 +626,7 @@ function promptNextStatus(playerName, role) {
   const response = ui.prompt(
     `${role}の対戦後ステータス`,
     `${role}: ${playerName}\n\n対戦後の状態を番号で入力してください（省略可: 1）:\n1: 待機（次のマッチングへ）\n2: 休憩\n3: ドロップアウト（大会終了）`,
-    ui.ButtonSet.OK_CANCEL
+    ui.ButtonSet.OK_CANCEL,
   );
 
   if (response.getSelectedButton() !== ui.Button.OK) {
@@ -636,9 +636,12 @@ function promptNextStatus(playerName, role) {
 
   const input = response.getResponseText().trim();
   switch (input) {
-    case "2": return PLAYER_STATUS.RESTING;
-    case "3": return PLAYER_STATUS.DROPPED;
-    default:  return PLAYER_STATUS.WAITING; // "1" または空欄はデフォルト待機
+    case "2":
+      return PLAYER_STATUS.RESTING;
+    case "3":
+      return PLAYER_STATUS.DROPPED;
+    default:
+      return PLAYER_STATUS.WAITING; // "1" または空欄はデフォルト待機
   }
 }
 

@@ -16,6 +16,11 @@ function registerPlayer() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const ui = SpreadsheetApp.getUi();
   let lock = null;
+  const autoMatchingGate = withAutoMatchingGate("プレイヤー登録", (gate) => gate);
+
+  if (!autoMatchingGate) {
+    return;
+  }
 
   // ロック取得前にUI入力を完了させる
   const response = ui.prompt("プレイヤー登録", "プレイヤー名を入力してください：", ui.ButtonSet.OK_CANCEL);
@@ -31,6 +36,10 @@ function registerPlayer() {
 
   try {
     lock = acquireLock("プレイヤー登録");
+
+    if (!autoMatchingGate.assertUnchanged()) {
+      return;
+    }
 
     const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
     if (!playerSheet) {
@@ -91,7 +100,7 @@ function registerPlayer() {
 
   if (shouldRunMatching) {
     try {
-      matchPlayers();
+      runAutoMatchingCycle();
     } catch (e) {
       Logger.log("registerPlayer: matchPlayers 実行エラー: " + e.toString());
     }
@@ -104,6 +113,11 @@ function registerPlayer() {
  */
 function editPlayerName() {
   const ui = SpreadsheetApp.getUi();
+  const autoMatchingGate = withAutoMatchingGate("プレイヤー名編集", (gate) => gate);
+
+  if (!autoMatchingGate) {
+    return;
+  }
 
   const playerId = promptPlayerId("プレイヤー名編集", "編集するプレイヤーIDの**数字部分のみ**を入力してください (例: P001なら「1」)。");
   if (!playerId) return;
@@ -161,6 +175,9 @@ function editPlayerName() {
   let lock = null;
   try {
     lock = acquireLock("プレイヤー名編集");
+    if (!autoMatchingGate.assertUnchanged()) {
+      return;
+    }
     const freshSheet = ss.getSheetByName(SHEET_PLAYERS);
     if (!freshSheet) {
       ui.alert("エラー: プレイヤーシートが見つかりません。");
@@ -269,6 +286,11 @@ function restPlayer() {
  */
 function returnPlayerFromResting() {
   const ui = SpreadsheetApp.getUi();
+  const autoMatchingGate = withAutoMatchingGate("休憩からの復帰", (gate) => gate);
+
+  if (!autoMatchingGate) {
+    return;
+  }
 
   const playerId = promptPlayerId("休憩からの復帰", "復帰するプレイヤーIDの**数字部分のみ**を入力してください (例: P001なら「1」)。");
   if (!playerId) return;
@@ -329,6 +351,10 @@ function returnPlayerFromResting() {
     // 確認後にロックを取得して状態変更
     lock = acquireLock("休憩からの復帰");
 
+    if (!autoMatchingGate.assertUnchanged()) {
+      return;
+    }
+
     // 状態を待機に変更（ロック取得後に再度シートを取得して最新状態で更新）
     const freshPlayerSheet = ss.getSheetByName(SHEET_PLAYERS);
     if (!freshPlayerSheet) {
@@ -355,7 +381,7 @@ function returnPlayerFromResting() {
 
   if (shouldRunMatching) {
     try {
-      matchPlayers();
+      runAutoMatchingCycle();
     } catch (e) {
       Logger.log("returnPlayerFromResting: matchPlayers 実行エラー: " + e.toString());
     }
@@ -453,10 +479,25 @@ function updatePlayerState(options) {
   let lock = null;
   let result = { success: false, message: "未処理" };
   let shouldRunMatching = false;
+  const autoMatchingGate = withAutoMatchingGate("状態変更", (gate) => gate);
+
+  if (!autoMatchingGate) {
+    return {
+      success: false,
+      message: "自動マッチング処理中は状態変更できません。処理完了後に再実行してください。",
+    };
+  }
 
   try {
     // 単一ロックで状態変更と結果記録を保護
     lock = acquireLock("プレイヤー状態変更");
+
+    if (!autoMatchingGate.assertUnchanged()) {
+      return {
+        success: false,
+        message: "自動マッチング処理中は状態変更できません。処理完了後に再実行してください。",
+      };
+    }
 
     // 1. プレイヤーの現在の状態を確認
     const playerSheet = ss.getSheetByName(SHEET_PLAYERS);
@@ -620,7 +661,7 @@ function updatePlayerState(options) {
 
   if (shouldRunMatching) {
     try {
-      matchPlayers();
+      runAutoMatchingCycle();
     } catch (e) {
       Logger.log("handleMatchStateChange: matchPlayers 実行エラー: " + e.toString());
     }

@@ -35,6 +35,11 @@ function onOpen() {
  */
 function startTournament() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const autoMatchingGate = withAutoMatchingGate("大会開始", (gate) => gate);
+
+  if (!autoMatchingGate) {
+    return;
+  }
 
   // 確認メッセージを表示
   const ui = SpreadsheetApp.getUi();
@@ -42,6 +47,10 @@ function startTournament() {
 
   if (response !== ui.Button.YES) {
     ui.alert("大会開始をキャンセルしました。");
+    return;
+  }
+
+  if (!autoMatchingGate.assertUnchanged()) {
     return;
   }
 
@@ -66,11 +75,20 @@ function startTournament() {
 function endTournament() {
   const ui = SpreadsheetApp.getUi();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const autoMatchingGate = withAutoMatchingGate("大会終了", (gate) => gate);
+
+  if (!autoMatchingGate) {
+    return;
+  }
 
   const response = ui.alert("大会終了", "大会を終了して対戦履歴をバックアップします。よろしいですか？", ui.ButtonSet.YES_NO);
 
   if (response !== ui.Button.YES) {
     ui.alert("大会終了をキャンセルしました。");
+    return;
+  }
+
+  if (!autoMatchingGate.assertUnchanged()) {
     return;
   }
 
@@ -334,6 +352,11 @@ function setMaxTables(maxTables) {
 function configureMaxTables() {
   const ui = SpreadsheetApp.getUi();
   const currentMaxTables = getMaxTables();
+  const autoMatchingGate = withAutoMatchingGate("最大卓数の設定", (gate) => gate);
+
+  if (!autoMatchingGate) {
+    return;
+  }
 
   const response = ui.prompt(
     "最大卓数の設定",
@@ -343,6 +366,10 @@ function configureMaxTables() {
 
   if (response.getSelectedButton() !== ui.Button.OK) {
     ui.alert("設定をキャンセルしました。");
+    return;
+  }
+
+  if (!autoMatchingGate.assertUnchanged()) {
     return;
   }
 
